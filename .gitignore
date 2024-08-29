@@ -1,0 +1,65 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+env/
+venv/
+*.env
+*.venv
+
+# Poetry
+.poetry/
+poetry.lock
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# PostgreSQL
+*.pgdata/
+*.psql/
+*.pgpass
+*.sql
+*.backup
+*.dump
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+*.dockerignore
+
+# Secrets
+*.key
+*.pem
+*.crt
+*.csr
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Test and coverage
+.coverage
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+*.mo
+*.pot
