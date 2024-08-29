@@ -10,6 +10,8 @@ from . import router
 from .core import config
 
 
+
+
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     yield
@@ -22,6 +24,7 @@ def create_app(settings=None):
 
     app = FastAPI(lifespan=lifespan)
     db.init_db(settings)
-    router.init_router(app)
+    app.include_router(router.get_router() , prefix="/api")
+
     return app
 
