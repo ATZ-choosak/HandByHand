@@ -4,7 +4,11 @@ from . import item
 
 router = APIRouter()
 
-router.include_router(root.router , prefix="" , tags=["Main"])
+def init_router_root(app):
+    app.include_router(root.router, tags=["Main"])
+
+
+#Router
 router.include_router(item.router , prefix="/items" , tags=["Items"])
 
 

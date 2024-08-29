@@ -24,6 +24,7 @@ def create_app(settings=None):
 
     app = FastAPI(lifespan=lifespan)
     db.init_db(settings)
+    router.init_router_root(app)
     app.include_router(router.get_router() , prefix="/api")
 
     return app
