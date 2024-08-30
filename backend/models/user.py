@@ -27,5 +27,5 @@ class User(SQLModel, UserBase, table=True):
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    items: List["Item"] = Relationship(back_populates="user")
+    items: List["Item"] = Relationship(back_populates="owner")
     exchanges_requested: List["Exchange"] = Relationship(back_populates="requester")

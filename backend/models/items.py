@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 if TYPE_CHECKING:
@@ -20,5 +20,7 @@ class ItemRead(ItemBase):
 class Item(ItemBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     owner_id: Optional[int] = Field(default=None, foreign_key="user.id")
-    user: "User" = Relationship(back_populates="items")
-    exchanges: Optional["Exchange"] = Relationship(back_populates="item")
+    
+    owner: "User" = Relationship(back_populates="items")
+    exchanges_requested: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.requested_item_id"})
+    exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
