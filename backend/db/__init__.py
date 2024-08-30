@@ -6,7 +6,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.models.items import *
-
+from backend.models.user import *
+from backend.models.exchanges import *
 
 connect_args = {}
 
