@@ -47,7 +47,7 @@ async def get_chat_sessions(
 
 @router.post("", response_model=dict)
 async def create_chat(
-    user2: int,
+    user: int,
     current_user: User = Depends(get_current_user)
 ):
     collection = get_db().get_collection("chats")
@@ -55,8 +55,8 @@ async def create_chat(
     # Check if a chat session already exists
     existing_chat = collection.find_one({
         "$or": [
-            {"user1": current_user.id, "user2": user2},
-            {"user1": user2, "user2": current_user.id}
+            {"user1": current_user.id, "user2": user},
+            {"user1": user, "user2": current_user.id}
         ]
     })
 
@@ -66,7 +66,7 @@ async def create_chat(
     # Create a new chat session
     chat_data = dict()
     chat_data["user1"] = current_user.id
-    chat_data["user2"] = user2
+    chat_data["user2"] = user
     chat_data["messages"] = []  # Initialize messages as an empty array
     result = collection.insert_one(chat_data)
 
