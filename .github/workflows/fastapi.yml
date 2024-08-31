@@ -12,6 +12,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        pip install poetry
+        poetry install
+
     - name: Create .env file
       run: |
         echo DATABASE_URL=${{ secrets.DATABASE_URL }} > .env
@@ -24,10 +34,7 @@ jobs:
         echo EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }} >> .env
         echo EMAILS_FROM_NAME=${{ secrets.EMAILS_FROM_NAME }} >> .env
 
-    - name: Deploy with Docker Compose
+    - name: Deploy
       run: |
         # Stop and remove any existing containers and networks
-        sudo docker-compose down
-
-        # Start up the services defined in your docker-compose.yml
-        sudo docker-compose up -d
+        pm2 start "poetry run uvicorn backend.main:create_app --host 0.0.0.0 --port 9090" --name fastapi
