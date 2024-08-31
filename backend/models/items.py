@@ -1,28 +1,26 @@
-from pydantic import BaseModel, ConfigDict
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel, Field, Relationship
+from typing import List, Optional, TYPE_CHECKING
+from datetime import datetime
 
-class BaseItem(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    name: str
+if TYPE_CHECKING:
+    from .user import User
+    from .exchanges import Exchange
 
-class CreatedItem(BaseItem):
+class ItemBase(SQLModel):
+    title: str
+    description: Optional[str] = None
+
+class ItemCreate(ItemBase):
     pass
 
-
-class UpdatedItem(BaseItem):
-    pass
-
-
-class Item(BaseItem):
+class ItemRead(ItemBase):
     id: int
+    owner_id: int
 
-class DBItem(BaseItem, SQLModel, table=True):
-    __tablename__ = "items"
-    id: int = Field(default=None, primary_key=True)
-
-class ItemList(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    items: list[Item]
-    page: int
-    page_count: int
-    size_per_page: int
+class Item(ItemBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    
+    owner: "User" = Relationship(back_populates="items")
+    exchanges_requested: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.requested_item_id"})
+    exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verify</title>
+</head>
+<body>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        }
+
+        .container {
+            padding: 5rem;
+            text-align: center;
+            position:  fixed;
+            left:  50%;
+            top: 50%;
+            transform: translate(-50% , -50%);
+            box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+            border-radius: 1rem;
+        }
+
+        .box{
+            color: #2da029;
+        }
+
+
+    </style>
+
+    <div class="container">
+        <div class="box">
+            <p>{{ message }}</p>
+        </div>
+    </div>
+</body>
+</html>
