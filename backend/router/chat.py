@@ -25,6 +25,9 @@ async def get_chat_sessions(
             {"user2": current_user.id}
         ],
     })
+
+    if chats_cursor is None:
+        return []
     
     chat_list = []
 
