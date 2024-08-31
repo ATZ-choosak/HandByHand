@@ -6,28 +6,28 @@ on:
 
 jobs:
   build:
-
     runs-on: self-hosted
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Create .env file
+      run: |
+        echo DATABASE_URL=${{ secrets.DATABASE_URL }} > .env
+        echo MONGO_URI=${{ secrets.MONGO_URI }} >> .env
+        echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
+        echo SMTP_SERVER=${{ secrets.SMTP_SERVER }} >> .env
+        echo SMTP_PORT=${{ secrets.SMTP_PORT }} >> .env
+        echo SMTP_USER=${{ secrets.SMTP_USER }} >> .env
+        echo SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }} >> .env
+        echo EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }} >> .env
+        echo EMAILS_FROM_NAME=${{ secrets.EMAILS_FROM_NAME }} >> .env
+
     - name: Deploy with Docker Compose
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        MONGO_URI: ${{ secrets.MONGO_URI }}
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT }}
-        SMTP_USER: ${{ secrets.SMTP_USER }}
-        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-        EMAILS_FROM_EMAIL: ${{ secrets.EMAILS_FROM_EMAIL }}
-        EMAILS_FROM_NAME: ${{ secrets.EMAILS_FROM_NAME }}
       run: |
         # Stop and remove any existing containers and networks
         docker-compose down
 
         # Start up the services defined in your docker-compose.yml
         docker-compose up -d
-
