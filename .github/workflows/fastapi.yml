@@ -13,20 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-
-    - name: Install dependencies
-      run: |
-        pip install poetry
-        poetry install
-
-    - name: Build Docker image
-      run: |
-        docker build -t my-fastapi-app .
-
     - name: Deploy with Docker Compose
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
