@@ -44,7 +44,7 @@ async def register_user(user: UserCreate, session: AsyncSession = Depends(get_se
         data={"sub": db_user.email},
         expires_delta=timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
     )
-    verification_url = f"http://localhost:8000/api/auth/verify-email?token={verification_token}"
+    verification_url = f"http://atozerserver.3bbddns.com:21758/api/auth/verify-email?token={verification_token}"
     await send_verification_email(db_user.email, verification_url)
     
     return db_user
