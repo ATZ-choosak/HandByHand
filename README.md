@@ -44,7 +44,6 @@ poetry run python initial-db.py
 ```
 
 ## 4. Run server
-* Windows
 ```bash
 poetry run uvicorn backend.main:create_app --reload --factory
 ```
