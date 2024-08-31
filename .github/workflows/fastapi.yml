@@ -1,0 +1,42 @@
+name: FastAPI CI/CD
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'  # Use the Python version you prefer
+
+    - name: Install dependencies
+      run: |
+        pip install poetry
+        poetry install
+
+    - name: Deploy
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        MONGO_URI: ${{ secrets.MONGO_URI }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        SMTP_USER: ${{ secrets.SMTP_USER }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        EMAILS_FROM_EMAIL: ${{ secrets.EMAILS_FROM_EMAIL }}
+        EMAILS_FROM_NAME: ${{ secrets.EMAILS_FROM_NAME }}
+      run: |
+        # Ensure any pre-deployment steps are done, e.g., database migrations
+        # poetry run alembic upgrade head  # Example for SQLAlchemy migrations
+
+        # Run the application (consider using a process manager for production deployment)
+        poetry run uvicorn backend.main:create_app --host 0.0.0.0 --port 9090
