@@ -30,14 +30,14 @@ async def get_chat_sessions(
 
     for chat in chats_cursor:
 
-        if chat["user1"] == current_user.id:
-            user = await session.get(User, chat["user2"])
+        if chat["user1"] == current_user.id: # type: ignore
+            user = await session.get(User, chat["user2"]) # type: ignore
 
-        if chat["user2"] == current_user.id:
-            user = await session.get(User, chat["user1"])
+        if chat["user2"] == current_user.id: # type: ignore
+            user = await session.get(User, chat["user1"]) # type: ignore
 
         chat_list.append({
-            "_id": str(chat["_id"]),  # Convert ObjectId to string for JSON serialization
+            "_id": str(chat["_id"]),  # Convert ObjectId to string for JSON serialization # type: ignore
             "user" : {
                 "name" : user.name
             }
@@ -61,7 +61,7 @@ async def create_chat(
     })
 
     if existing_chat:
-        return {"message": "Chat session already exists.", "chat_id": str(existing_chat["_id"])}
+        return {"message": "Chat session already exists.", "chat_id": str(existing_chat["_id"])} # type: ignore
 
     # Create a new chat session
     chat_data = dict()
@@ -94,17 +94,17 @@ async def send_message(
         raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
 
     # Check if the current user is part of the chat
-    if chat["user1"] != current_user.id and chat["user2"] != current_user.id:
+    if chat["user1"] != current_user.id and chat["user2"] != current_user.id: # type: ignore
         raise HTTPException(status_code=403, detail="Not authorized to send message in this chat")
 
     # Ensure the messages field is an array
     if chat.get("messages") is None:
-        chat["messages"] = []
+        chat["messages"] = [] # type: ignore
 
     # Add the message to the chat
     message_data = {
         "sender": current_user.id,
-        "receiver": chat["user2"] if chat["user1"] == current_user.id else chat["user1"],
+        "receiver": chat["user2"] if chat["user1"] == current_user.id else chat["user1"], # type: ignore
         "message": message,
         "timestamp": datetime.utcnow(),
         "message_type": message_type
@@ -143,7 +143,7 @@ async def get_messages_by_chat_id(
         raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
 
     # Check if the current user is part of the chat
-    if chat["user1"] != current_user.id and chat["user2"] != current_user.id:
+    if chat["user1"] != current_user.id and chat["user2"] != current_user.id: # type: ignore
         raise HTTPException(status_code=403, detail="Not authorized to view messages in this chat")
 
     # Retrieve the messages from the chat
@@ -151,14 +151,14 @@ async def get_messages_by_chat_id(
 
     # Replace sender and receiver IDs with names
     for msg in messages:
-        sender = await session.get(User, msg["sender"])
-        receiver = await session.get(User, msg["receiver"])
+        sender = await session.get(User, msg["sender"]) # type: ignore
+        receiver = await session.get(User, msg["receiver"]) # type: ignore
 
-        msg["sender_name"] = sender.name
-        msg["receiver_name"] = receiver.name
+        msg["sender_name"] = sender.name # type: ignore
+        msg["receiver_name"] = receiver.name # type: ignore
 
         # Add a flag to indicate if the sender or receiver is the current user
-        msg["sender_is_me"] = sender.id == current_user.id
-        msg["receiver_is_me"] = receiver.id == current_user.id
+        msg["sender_is_me"] = sender.id == current_user.id # type: ignore
+        msg["receiver_is_me"] = receiver.id == current_user.id # type: ignore
 
     return messages

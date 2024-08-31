@@ -8,15 +8,15 @@ from ..utils.auth import get_current_user, get_password_hash
 from ..db import get_session
 
 router = APIRouter()
-@router.delete("/{user_id}")
-async def delete_user(user_id: int, session: AsyncSession = Depends(get_session)):
-    db_user = await session.get(User, user_id)
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+# @router.delete("/{user_id}")
+# async def delete_user(user_id: int, session: AsyncSession = Depends(get_session)):
+#     db_user = await session.get(User, user_id)
+#     if not db_user:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    await session.delete(db_user)
-    await session.commit()
-    return {"message": "User deleted successfully"}
+#     await session.delete(db_user)
+#     await session.commit()
+#     return {"message": "User deleted successfully"}
 # Get current user's information
 @router.get("/me", response_model=UserRead)
 async def get_me(current_user: User = Depends(get_current_user)):
