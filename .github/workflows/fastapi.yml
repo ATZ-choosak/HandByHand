@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout code
-    - uses: actions/checkout@v4
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -35,9 +35,8 @@ jobs:
         EMAILS_FROM_EMAIL: ${{ secrets.EMAILS_FROM_EMAIL }}
         EMAILS_FROM_NAME: ${{ secrets.EMAILS_FROM_NAME }}
       run: |
+        # Ensure any pre-deployment steps are done, e.g., database migrations
+        # poetry run alembic upgrade head  # Example for SQLAlchemy migrations
+
+        # Run the application (consider using a process manager for production deployment)
         poetry run uvicorn backend.main:create_app --host 0.0.0.0 --port 9090
-        
-
-
-
-    
