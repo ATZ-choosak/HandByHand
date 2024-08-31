@@ -39,8 +39,6 @@ dist/
 *.egg-info/
 
 # Docker
-Dockerfile
-docker-compose.yml
 .dockerignore
 *.dockerignore
 
