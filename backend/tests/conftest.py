@@ -1,3 +1,7 @@
+import sys
+import pathlib
+sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent.parent))
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -6,6 +10,7 @@ from sqlmodel import SQLModel
 from backend.models.user import User
 from backend.models.items import Item
 from backend.models.exchanges import Exchange
+
 
 @pytest_asyncio.fixture(scope="function")
 async def async_engine():
