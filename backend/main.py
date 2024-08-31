@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from . import db
 from . import router
 from .core import config
+from .db import mongodb
 
 
 
@@ -26,6 +27,9 @@ def create_app(settings=None):
     db.init_db(settings)
     router.init_router_root(app)
     app.include_router(router.get_router() , prefix="/api")
+
+    #init mongodb
+    mongodb.init_mongoDB(settings)
 
     return app
 
