@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 from ..models.user import User, UserCreate, UserRead
 from ..db import get_session
@@ -49,7 +50,7 @@ async def register_user(user: UserCreate, session: AsyncSession = Depends(get_se
     return db_user
 
 @router.get("/verify-email")
-async def verify_email(token: str, session: AsyncSession = Depends(get_session)):
+async def verify_email(token: str, request: Request, session: AsyncSession = Depends(get_session)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         email = payload.get("sub")
@@ -63,7 +64,12 @@ async def verify_email(token: str, session: AsyncSession = Depends(get_session))
 
         db_user.is_verified = True
         await session.commit()
-        return {"message": "Email verified successfully"}
+        
+        templates = Jinja2Templates(directory='backend/template')
+
+        return templates.TemplateResponse(
+            request=request, name="email_verify_success.html", context={ "message" :"Email verified successfully"}
+        )
 
     except JWTError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
