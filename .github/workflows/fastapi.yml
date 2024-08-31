@@ -34,7 +34,13 @@ jobs:
         echo EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }} >> .env
         echo EMAILS_FROM_NAME=${{ secrets.EMAILS_FROM_NAME }} >> .env
 
-    - name: Deploy
+    - name: Deploy with pm2
       run: |
-        # Stop and remove any existing containers and networks
-        pm2 restart "poetry run uvicorn backend.main:create_app --host 0.0.0.0 --port 9090" --name fastapi
+        # Check if the FastAPI process is running
+        if pm2 list | grep -q fastapi; then
+          # If running, restart it
+          pm2 restart fastapi
+        else
+          # If not running, start it
+          pm2 start "poetry run uvicorn backend.main:create_app --host 0.0.0.0 --port 9090" --name fastapi
+        fi
