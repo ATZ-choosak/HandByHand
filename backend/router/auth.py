@@ -75,12 +75,12 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
 
 @router.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(username: str, password: str, session: AsyncSession = Depends(get_session)):
     await session.flush()
-    user = await session.execute(select(User).where(User.email == form_data.username))  # ใช้ `email` ในการล็อกอิน
+    user = await session.execute(select(User).where(User.email == username))  # ใช้ `email` ในการล็อกอิน
     user = user.scalar_one_or_none()
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
