@@ -5,7 +5,7 @@ from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
-from ..models.user import User, UserCreate, UserRead
+from ..models.user import User, UserCreate, UserRead, UserLoginInput
 from ..db import get_session
 from ..utils.auth import create_access_token, get_password_hash, verify_password
 from ..utils.email import send_verification_email
@@ -75,12 +75,12 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
 
 @router.post("/token")
-async def login_for_access_token(username: str, password: str, session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(user: UserLoginInput, session: AsyncSession = Depends(get_session)):
     await session.flush()
-    user = await session.execute(select(User).where(User.email == username))  # ใช้ `email` ในการล็อกอิน
+    user = await session.execute(select(User).where(User.email == user.username))  # ใช้ `email` ในการล็อกอิน
     user = user.scalar_one_or_none()
     
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(user.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

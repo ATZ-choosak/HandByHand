@@ -19,6 +19,10 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
 
+class UserLoginInput(BaseModel):
+    username: str
+    password: str
+
 class User(SQLModel, UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: EmailStr = Field(unique=True, index=True)
