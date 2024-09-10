@@ -34,11 +34,6 @@ jobs:
         echo EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }} >> .env
         echo EMAILS_FROM_NAME=${{ secrets.EMAILS_FROM_NAME }} >> .env
 
-    - name: Set up Docker Compose
-      run: |
-        sudo apt-get update
-        sudo apt-get install docker-compose -y
-
     - name: Build and run Docker Compose
       run: |
         docker-compose down   # Stop any running containers
