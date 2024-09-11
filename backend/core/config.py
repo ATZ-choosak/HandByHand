@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     EMAILS_FROM_EMAIL: str
     EMAILS_FROM_NAME: str
-
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
+   
     model_config = SettingsConfigDict(
         env_file=".env", validate_assignment=True, extra="allow"
     )

@@ -5,9 +5,11 @@ from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
+from pydantic import EmailStr
 from ..models.user import User, UserCreate, UserRead, UserLoginInput
 from ..db import get_session
-from ..utils.auth import create_access_token, get_password_hash, verify_password
+from ..utils.email import send_password_reset_email
+from ..utils.auth import create_access_token, get_password_hash, verify_password,create_password_reset_token
 from ..utils.email import send_verification_email
 from ..core.config import get_settings
 from sqlalchemy.exc import IntegrityError
@@ -98,3 +100,53 @@ async def login_for_access_token(user_input: UserLoginInput, session: AsyncSessi
         data={"sub": user.email}, expires_delta=access_token_expires  # เก็บ `email` ในโทเค็น
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/password-reset/request")
+async def request_password_reset(email: EmailStr, session: AsyncSession = Depends(get_session)):
+    # Find user by email
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email not found")
+
+    # Generate a password reset token
+    reset_token = create_password_reset_token(user.email)
+
+    # Create password reset URL
+    reset_url = f"http://yourfrontend.com/reset-password?token={reset_token}"
+
+    # Send password reset email
+    await send_password_reset_email(user.email, reset_url)
+
+    return {"message": "Password reset email sent"}
+
+
+@router.post("/password-reset/reset")
+async def reset_password(token: str, new_password: str, session: AsyncSession = Depends(get_session)):
+    try:
+        # Decode token
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("sub")
+
+        if not email:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+
+        # Find the user by email
+        result = await session.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # Hash the new password
+        hashed_password = get_password_hash(new_password)
+
+        # Update user password
+        user.hashed_password = hashed_password
+        await session.commit()
+
+        return {"message": "Password reset successful"}
+
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")

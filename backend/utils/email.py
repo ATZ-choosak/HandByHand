@@ -27,3 +27,25 @@ async def send_verification_email(email_to: str, verification_url: str):
         use_tls=False,  
         start_tls=True  
     )
+
+async def send_password_reset_email(email_to: str, reset_url: str):
+    env = Environment(loader=FileSystemLoader('backend/template'))
+    template = env.get_template("verify_email.html")  # You can create a custom email template for password reset
+    html_content = template.render(verification_url=reset_url)
+
+    msg = MIMEMultipart()
+    msg["From"] = settings.EMAILS_FROM_EMAIL
+    msg["To"] = email_to
+    msg["Subject"] = "Password Reset Request"
+
+    msg.attach(MIMEText(html_content, "html"))
+
+    await send(
+        msg,
+        hostname=settings.SMTP_SERVER,
+        port=settings.SMTP_PORT,
+        username=settings.SMTP_USER,
+        password=settings.SMTP_PASSWORD,
+        use_tls=False,
+        start_tls=True
+    )
