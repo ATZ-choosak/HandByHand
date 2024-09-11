@@ -47,3 +47,9 @@ def create_password_reset_token(email: str):
     expires = timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
     reset_token = create_access_token(data={"sub": email}, expires_delta=expires)
     return reset_token
+
+# Create an email verification token (JWT)
+def create_verification_token(email: str):
+    expires = timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
+    verification_token = create_access_token(data={"sub": email}, expires_delta=expires)
+    return verification_token

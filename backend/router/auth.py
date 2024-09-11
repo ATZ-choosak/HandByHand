@@ -9,7 +9,7 @@ from pydantic import EmailStr
 from ..models.user import User, UserCreate, UserRead, UserLoginInput
 from ..db import get_session
 from ..utils.email import send_password_reset_email
-from ..utils.auth import create_access_token, get_password_hash, verify_password,create_password_reset_token
+from ..utils.auth import create_access_token, get_password_hash, verify_password,create_password_reset_token,create_verification_token
 from ..utils.email import send_verification_email
 from ..core.config import get_settings
 from sqlalchemy.exc import IntegrityError
@@ -150,3 +150,26 @@ async def reset_password(token: str, new_password: str, session: AsyncSession = 
 
     except JWTError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+
+@router.post("/resend-verification")
+async def resend_verification_link(email: EmailStr, session: AsyncSession = Depends(get_session)):
+    # Find user by email
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.is_verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already verified")
+
+    # Generate a new verification token
+    verification_token = create_verification_token(user.email)
+
+    # Create verification URL
+    verification_url = f"http://127.0.0.1:8000/api/auth/verify-email?token={verification_token}"
+
+    # Send verification email
+    await send_verification_email(user.email, verification_url)
+
+    return {"message": "Verification email resent successfully"}
