@@ -22,4 +22,4 @@ COPY . .
 EXPOSE 9090
 
 # Command to run the application using uvicorn
-CMD ["poetry", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "9090", "--workers", "4", "--preload"]
+CMD ["poetry", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "9090"]
