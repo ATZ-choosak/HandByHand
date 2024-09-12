@@ -1,18 +1,19 @@
-# Use the official Python 3.12 image as the base image
-FROM python:3.12.5-alpine3.20
+# Use the official Python 3.12 slim image as the base image for better compatibility and performance
+FROM python:3.12-slim
 
 # Set the working directory in the container
 WORKDIR /app
 
 # Install build dependencies and Poetry
-RUN apk add --no-cache gcc python3-dev musl-dev linux-headers \
+RUN apt-get update && apt-get install -y gcc python3-dev libffi-dev openssl-dev cargo \
     && pip install --no-cache-dir poetry
 
 # Copy the pyproject.toml and poetry.lock files into the container
 COPY pyproject.toml poetry.lock ./
 
-# Install dependencies with Poetry
-RUN poetry install --no-root
+# Install dependencies with Poetry, without dev dependencies in production
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-root --no-dev
 
 # Copy the FastAPI application code into the container
 COPY . .
@@ -21,4 +22,4 @@ COPY . .
 EXPOSE 9090
 
 # Command to run the application using uvicorn
-CMD ["poetry", "run", "uvicorn", "backend.main:create_app", "--host", "0.0.0.0", "--port", "9090", "--factory"]
+CMD ["poetry", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "9090", "--workers", "4", "--preload"]
