@@ -1,11 +1,11 @@
-# Use the official Python 3.12 slim image as the base image for better compatibility and performance
+# Use the official Python 3.12 slim image as the base image
 FROM python:3.12-slim
 
 # Set the working directory in the container
 WORKDIR /app
 
 # Install build dependencies and Poetry
-RUN apt-get update && apt-get install -y gcc python3-dev libffi-dev openssl-dev cargo \
+RUN apt-get update && apt-get install -y gcc python3-dev libffi-dev libssl-dev cargo \
     && pip install --no-cache-dir poetry
 
 # Copy the pyproject.toml and poetry.lock files into the container
