@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
+from typing import Annotated
 from sqlmodel import select
 from pydantic import EmailStr
 from ..models.user import User, UserCreate, UserRead, UserLoginInput
@@ -46,7 +47,7 @@ async def register_user(user: UserCreate, session: AsyncSession = Depends(get_se
         data={"sub": db_user.email},
         expires_delta=timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
     )
-    verification_url = f"http://atozerserver.3bbddns.com:21758/api/auth/verify-email?token={verification_token}"
+    verification_url = f"{settings.BASE_URL}/auth/verify-email?token={verification_token}"
     await send_verification_email(db_user.email, verification_url)
     
     return db_user
@@ -77,12 +78,12 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
 
 @router.post("/token")
-async def login_for_access_token(user_input: UserLoginInput, session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends(UserLoginInput)], session: AsyncSession = Depends(get_session)):
     await session.flush()
-    user = await session.execute(select(User).where(User.email == user_input.username))  # ใช้ `email` ในการล็อกอิน
+    user = await session.execute(select(User).where(User.email == form_data.username))  # ใช้ `email` ในการล็อกอิน
     user = user.scalar_one_or_none()
     
-    if not user or not verify_password(user_input.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -114,7 +115,7 @@ async def request_password_reset(email: EmailStr, session: AsyncSession = Depend
     reset_token = create_password_reset_token(user.email)
 
     # Create password reset URL
-    reset_url = f"http://yourfrontend.com/reset-password?token={reset_token}"
+    reset_url = f"{settings.BASE_URL}/reset-password?token={reset_token}"
 
     # Send password reset email
     await send_password_reset_email(user.email, reset_url)
