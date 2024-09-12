@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 from datetime import timedelta
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordRequestFormStrict
 from fastapi.templating import Jinja2Templates
 from typing import Annotated
 from sqlmodel import select
@@ -78,7 +78,7 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
 
 @router.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(form_data: OAuth2PasswordRequestFormStrict = Depends(), session: AsyncSession = Depends(get_session)):
     #await session.flush()
     print(form_data)
     user = await session.execute(select(User).where(User.email == form_data.username))  # ใช้ `email` ในการล็อกอิน
