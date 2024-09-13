@@ -77,33 +77,8 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
     except JWTError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
     
-@router.post("/token_for_swager")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
-    #await session.flush()
-    user = await session.execute(select(User).where(User.email == form_data.username))  # ใช้ `email` ในการล็อกอิน
-    user = user.scalar_one_or_none()
-    
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not verified",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires  # เก็บ `email` ในโทเค็น
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
 @router.post("/token")
-async def login_for_access_token(form_data: UserLoginInput, session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     #await session.flush()
     user = await session.execute(select(User).where(User.email == form_data.username))  # ใช้ `email` ในการล็อกอิน
     user = user.scalar_one_or_none()
