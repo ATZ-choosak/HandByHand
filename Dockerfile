@@ -1,6 +1,9 @@
 # Use the official Python 3.12 image as the base image (Debian-based)
 FROM python:3.12.6
 
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
+
 # Set the working directory in the container
 WORKDIR /app
 
