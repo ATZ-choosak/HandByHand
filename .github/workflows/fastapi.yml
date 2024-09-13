@@ -33,6 +33,7 @@ jobs:
         echo SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }} >> .env
         echo EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }} >> .env
         echo EMAILS_FROM_NAME=${{ secrets.EMAILS_FROM_NAME }} >> .env
+        echo PROD=${{ secrets.PROD }} >> .env
 
     - name: Build and run Docker Compose
       run: |
