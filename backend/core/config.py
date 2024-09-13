@@ -7,7 +7,6 @@ def getBaseUrl(prod):
             return "http://localhost:8000/api"
 
 class Settings(BaseSettings):
-
     DATABASE_URL: str
     MONGO_URI: str
     SECRET_KEY: str
