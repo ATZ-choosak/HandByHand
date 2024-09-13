@@ -193,7 +193,7 @@ async def resend_verification_link(email: EmailStr, session: AsyncSession = Depe
     verification_token = create_verification_token(user.email)
 
     # Create verification URL
-    verification_url = f"http://127.0.0.1:8000/api/auth/verify-email?token={verification_token}"
+    verification_url = f"{settings.BASE_URL}/auth/verify-email?token={verification_token}"
 
     # Send verification email
     await send_verification_email(user.email, verification_url)
