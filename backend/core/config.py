@@ -1,11 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-def getBaseUrl(prod):
-        if prod:
-            return "http://atozerserver.3bbddns.com:21758/api"
-        else:
-            return "http://localhost:8000/api"
-
 class Settings(BaseSettings):
     DATABASE_URL: str
     MONGO_URI: str
@@ -26,6 +20,4 @@ class Settings(BaseSettings):
     )
 
 def get_settings():
-     setting = Settings()
-     setting.BASE_URL = getBaseUrl(setting.PROD)
-     return setting
+    return Settings()
