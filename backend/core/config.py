@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str
     EMAILS_FROM_NAME: str
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
-    PROD: bool = False
+    PROD: bool
     BASE_URL: str = getBaseUrl(PROD)
    
     model_config = SettingsConfigDict(
