@@ -38,5 +38,4 @@ jobs:
 
     - name: Build and run Docker Compose
       run: |
-        docker-compose down   # Stop any running containers
-        docker-compose up -d --build  # Build and restart the containers
+        docker-compose restart
