@@ -26,7 +26,7 @@ def create_images_directory_if_not_exists():
     else:
         print(f"Directory {images_directory} already exists")
 # ฟังก์ชันสร้างแอป
-async def create_app(settings=None):
+def create_app(settings=None):
     if not settings:
         settings = config.get_settings()
 
@@ -35,12 +35,12 @@ async def create_app(settings=None):
     # เริ่มต้นการเชื่อมต่อกับฐานข้อมูล
     db.init_db(settings)
     router.init_router_root(app)
-    await app.include_router(router.get_router(), prefix="/api")
+    app.include_router(router.get_router(), prefix="/api")
 
     # เริ่มต้น MongoDB
     mongodb.init_mongoDB(settings)
     create_images_directory_if_not_exists()
-    await app.mount("/images", StaticFiles(directory="images"), name="images")
+    app.mount("/images", StaticFiles(directory="images"), name="images")
     
 
     return app
