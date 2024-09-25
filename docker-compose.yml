@@ -10,10 +10,13 @@ services:
     env_file:
       - .env 
     volumes:
-      - .:/app
+      - api_volume:/app
     networks:
       - fastapi_network
 
 networks:
   fastapi_network:
     driver: bridge
+
+volumes:
+  api_volume:
