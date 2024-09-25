@@ -9,6 +9,7 @@ venv/
 *.venv
 
 .images
+images
 
 # Poetry
 .poetry/
