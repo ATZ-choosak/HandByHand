@@ -1,4 +1,5 @@
 # ssl patch
+import os
 from gevent import monkey
 monkey.patch_all()
 
@@ -16,6 +17,14 @@ async def lifespan(app: FastAPI):
     if db.engine is not None:
         await db.close_session()
 
+def create_images_directory_if_not_exists():
+    images_directory = "images"
+    
+    if not os.path.exists(images_directory):
+        print(f"Creating directory: {images_directory}")
+        os.makedirs(images_directory)
+    else:
+        print(f"Directory {images_directory} already exists")
 # ฟังก์ชันสร้างแอป
 def create_app(settings=None):
     if not settings:
@@ -30,6 +39,7 @@ def create_app(settings=None):
 
     # เริ่มต้น MongoDB
     mongodb.init_mongoDB(settings)
+    create_images_directory_if_not_exists()
     app.mount("/images", StaticFiles(directory="images"), name="images")
     
 
