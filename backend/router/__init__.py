@@ -6,6 +6,7 @@ from . import user  # import the user router
 from . import exchange
 from . import chat
 from . import category
+from . import customer_interest
 
 router = APIRouter()
 
@@ -19,5 +20,6 @@ router.include_router(user.router, prefix="/users", tags=["Users"])  # include t
 router.include_router(exchange.router, prefix="/exchanges", tags=["Exchanges"])
 router.include_router(chat.router, prefix="/chats", tags=["Chats"])
 router.include_router(category.router, prefix="/categorys", tags=["categorys"])
+router.include_router(customer_interest.router, prefix="/api", tags=["CustomerInterest"])
 def get_router():
     return router
