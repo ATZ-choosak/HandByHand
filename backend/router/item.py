@@ -4,6 +4,8 @@ from typing import List
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+
+from backend.models.category import Category
 from ..models.items import Item, ItemCreate, ItemRead
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -155,3 +157,31 @@ async def delete_item_image(
         await session.commit()
     
     return {"message": "Image deleted successfully"}
+
+@router.put("/{item_id}/set-preferred-categories", response_model=ItemRead)
+async def set_preferred_categories(
+    item_id: int,
+    category_ids: List[int],
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the item from the database
+    db_item = await session.get(Item, item_id)
+    if not db_item or db_item.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Item not found or you do not have permission to update it")
+
+    # Validate category IDs
+    result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+    valid_category_ids = set(result.scalars().all())
+    invalid_category_ids = set(category_ids) - valid_category_ids
+    
+    if invalid_category_ids:
+        raise HTTPException(status_code=400, detail=f"Invalid category IDs: {invalid_category_ids}")
+
+    # Update preferred categories
+    db_item.preferred_category_ids = list(valid_category_ids)
+    
+    await session.commit()
+    await session.refresh(db_item)
+
+    return db_item
