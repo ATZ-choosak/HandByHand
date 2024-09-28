@@ -11,6 +11,7 @@ services:
       - .env 
     volumes:
       - api_volume:/app
+      - api_images:/app/images
     networks:
       - fastapi_network
 
@@ -20,3 +21,5 @@ networks:
 
 volumes:
   api_volume:
+    driver: local
+  api_images:
