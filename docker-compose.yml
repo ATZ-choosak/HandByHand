@@ -10,7 +10,7 @@ services:
     env_file:
       - .env 
     volumes:
-      - api_volume:/app
+      - .:/app
       - api_images:/app/images
     networks:
       - fastapi_network
@@ -20,6 +20,4 @@ networks:
     driver: bridge
 
 volumes:
-  api_volume:
-    driver: local
   api_images:
