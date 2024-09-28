@@ -1,3 +1,4 @@
+from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
@@ -20,7 +21,7 @@ class ItemRead(ItemBase):
 class Item(ItemBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     owner_id: Optional[int] = Field(default=None, foreign_key="user.id")
-    
+    image_urls: List[str] = Field(sa_column=Column(JSON), default_factory=list)
     owner: "User" = Relationship(back_populates="items")
     exchanges_requested: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.requested_item_id"})
     exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})

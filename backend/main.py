@@ -10,6 +10,7 @@ from . import router
 from .core import config
 from .db import mongodb
 from fastapi.staticfiles import StaticFiles
+
 # ใช้ async context manager สำหรับจัดการ lifespan ของแอป
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,11 +37,12 @@ def create_app(settings=None):
     db.init_db(settings)
     router.init_router_root(app)
     app.include_router(router.get_router(), prefix="/api")
-
+    # Create images directory
+    create_images_directory_if_not_exists()
     # เริ่มต้น MongoDB
     mongodb.init_mongoDB(settings)
-    create_images_directory_if_not_exists()
     app.mount("/images", StaticFiles(directory="images"), name="images")
     
 
     return app
+

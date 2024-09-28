@@ -27,6 +27,7 @@ class User(SQLModel, UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
+    profile_image_url: Optional[str] = None  # New field for profile image
     is_active: bool = Field(default=False)
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)

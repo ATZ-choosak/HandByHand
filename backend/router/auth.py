@@ -4,9 +4,11 @@ from jose import JWTError, jwt
 from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 from sqlmodel import select
 from pydantic import EmailStr
+
+
 from ..models.user import User, UserCreate, UserRead, UserLoginInput
 from ..db import get_session
 from ..utils.email import send_password_reset_email
@@ -14,6 +16,10 @@ from ..utils.auth import create_access_token, get_password_hash, verify_password
 from ..utils.email import send_verification_email
 from ..core.config import get_settings
 from sqlalchemy.exc import IntegrityError
+
+from ..utils.utils import create_user_directory
+   
+
 router = APIRouter()
 settings = get_settings()
 
@@ -36,6 +42,7 @@ async def register_user(user: UserCreate, session: AsyncSession = Depends(get_se
     try:
         await session.commit()
         await session.refresh(db_user)
+        create_user_directory(db_user.id)  # Create directory for the new user
     except IntegrityError:
         await session.rollback()
         raise HTTPException(
