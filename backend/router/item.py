@@ -20,7 +20,7 @@ async def create_item(
     title: str = Form(...),
     description: str = Form(...),
     category_id: int = Form(...),
-    preferred_category_ids: str = Form(...),  # Change this to str
+    preferred_category_ids: str = Form(...),
     is_exchangeable: bool = Form(...),
     require_all_categories: bool = Form(...),
     address: Optional[str] = Form(None),
@@ -37,7 +37,7 @@ async def create_item(
         preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid category IDs format. Please provide valid integers.")
-    # Rest of your function remains the same
+
     category = await session.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=400, detail=f"Invalid category ID: {category_id}")
@@ -66,8 +66,7 @@ async def create_item(
     item_directory = f"images/{current_user.id}/items/{db_item.id}"
     os.makedirs(item_directory, exist_ok=True)
 
-    image_ids = []
-    image_urls = []
+    images_data = []
 
     if images:
         for image in images:
@@ -79,11 +78,9 @@ async def create_item(
             with open(file_location, "wb") as f:
                 f.write(await image.read())
             
-            image_ids.append(image_id)
-            image_urls.append(file_location)
+            images_data.append({"id": image_id, "url": file_location})
 
-    db_item.image_ids = image_ids
-    db_item.image_urls = image_urls
+    db_item.images = images_data
 
     await session.commit()
     await session.refresh(db_item)

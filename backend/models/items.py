@@ -1,6 +1,6 @@
 from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
-from typing import List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 if TYPE_CHECKING:
@@ -11,9 +11,8 @@ class ItemBase(SQLModel):
     title: str
     description: Optional[str] = None
     preferred_category_ids: List[int] = Field(sa_column=Column(JSON), default_factory=list)
-    image_ids: List[str] = Field(sa_column=Column(JSON), default_factory=list)
-    image_urls: List[str] = Field(sa_column=Column(JSON), default_factory=list)
-    is_exchangeable: bool = Field(default=True)  # เพิ่ม field นี้
+    images: List[Dict[str, str]] = Field(sa_column=Column(JSON), default_factory=list)  # เปลี่ยนจาก image_ids และ image_urls
+    is_exchangeable: bool = Field(default=False)  # เพิ่ม field นี้
     require_all_categories: bool = Field(default=False)  # เพิ่ม field นี้
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")  # เพิ่ม field นี้
     address: Optional[str] = None  # เพิ่ม field นี้
