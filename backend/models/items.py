@@ -6,13 +6,19 @@ from datetime import datetime
 if TYPE_CHECKING:
     from .user import User
     from .exchanges import Exchange
-
+    from .category import Category
 class ItemBase(SQLModel):
     title: str
     description: Optional[str] = None
-    preferred_category_ids: List[int] = Field(sa_column=Column(JSON), default_factory=list)  # New field
+    preferred_category_ids: List[int] = Field(sa_column=Column(JSON), default_factory=list)
     image_ids: List[str] = Field(sa_column=Column(JSON), default_factory=list)
     image_urls: List[str] = Field(sa_column=Column(JSON), default_factory=list)
+    is_exchangeable: bool = Field(default=True)  # เพิ่ม field นี้
+    require_all_categories: bool = Field(default=False)  # เพิ่ม field นี้
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id")  # เพิ่ม field นี้
+    address: Optional[str] = None  # เพิ่ม field นี้
+    lon: Optional[float] = None  # เพิ่ม field นี้
+    lat: Optional[float] = None  # เพิ่ม field นี้
 class ItemCreate(ItemBase):
     pass
 
@@ -27,3 +33,4 @@ class Item(ItemBase, table=True):
     owner: "User" = Relationship(back_populates="items")
     exchanges_requested: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.requested_item_id"})
     exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
+    category: Optional["Category"] = Relationship(back_populates="items")  # เพิ่ม relationship นี้

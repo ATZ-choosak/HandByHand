@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 from typing import List, Optional
 import uuid
@@ -18,28 +19,45 @@ router = APIRouter()
 async def create_item(
     title: str = Form(...),
     description: str = Form(...),
-    preferred_category_ids: str = Form(...),
+    category_id: int = Form(...),
+    preferred_category_ids: str = Form(...),  # Change this to str
+    is_exchangeable: bool = Form(...),
+    require_all_categories: bool = Form(...),
+    address: Optional[str] = Form(None),
+    lon: Optional[float] = Form(None),
+    lat: Optional[float] = Form(None),
     images: List[UploadFile] = File(None),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    try:
-        category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid category IDs format")
+    if not re.match(r'^[0-9,]+$', preferred_category_ids):
+        raise HTTPException(status_code=400, detail="Invalid format for preferred_category_ids. Please provide comma-separated integers only.")
 
-    # ตรวจสอบว่า category ที่ระบุมีอยู่จริง
-    result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+    try:
+        preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid category IDs format. Please provide valid integers.")
+    # Rest of your function remains the same
+    category = await session.get(Category, category_id)
+    if not category:
+        raise HTTPException(status_code=400, detail=f"Invalid category ID: {category_id}")
+
+    result = await session.execute(select(Category.id).where(Category.id.in_(preferred_category_ids)))
     existing_category_ids = set(result.scalars().all())
-    invalid_category_ids = set(category_ids) - existing_category_ids
-    
+    invalid_category_ids = set(preferred_category_ids) - existing_category_ids
     if invalid_category_ids:
-        raise HTTPException(status_code=400, detail=f"Invalid category IDs: {invalid_category_ids}")
+        raise HTTPException(status_code=400, detail=f"Invalid preferred category IDs: {invalid_category_ids}")
 
     db_item = Item(
         title=title,
         description=description,
-        preferred_category_ids=list(existing_category_ids),  # ใช้เฉพาะ category ที่มีอยู่จริง
+        category_id=category_id,
+        preferred_category_ids=list(existing_category_ids),
+        is_exchangeable=is_exchangeable,
+        require_all_categories=require_all_categories,
+        address=address,
+        lon=lon,
+        lat=lat,
         owner_id=current_user.id
     )
     session.add(db_item)
