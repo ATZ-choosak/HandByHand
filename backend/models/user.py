@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 class UserBase(BaseModel):
     email: EmailStr
-    name: str
 
 class UserCreate(UserBase):
     password: str

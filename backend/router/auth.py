@@ -25,38 +25,31 @@ settings = get_settings()
 
 @router.post("/register", response_model=UserRead)
 async def register_user(user: UserCreate, session: AsyncSession = Depends(get_session)):
-    # ตรวจสอบว่ามีอีเมลนี้ในระบบหรือยัง
     existing_user = await session.execute(select(User).where(User.email == user.email))
     existing_user = existing_user.scalar_one_or_none()
-
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email is already registered",
         )
-
     hashed_password = get_password_hash(user.password)
-    db_user = User(email=user.email, name=user.name, hashed_password=hashed_password)
+    db_user = User(email=user.email, hashed_password=hashed_password)  # Removed name here
     session.add(db_user)
-    
     try:
         await session.commit()
         await session.refresh(db_user)
-        create_user_directory(db_user.id)  # Create directory for the new user
     except IntegrityError:
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="An error occurred during registration",
         )
-
     verification_token = create_access_token(
         data={"sub": db_user.email},
         expires_delta=timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
     )
     verification_url = f"{settings.BASE_URL}/auth/verify-email?token={verification_token}"
     await send_verification_email(db_user.email, verification_url)
-    
     return db_user
 
 @router.get("/verify-email")
