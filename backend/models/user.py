@@ -8,10 +8,14 @@ from typing import Optional, List, TYPE_CHECKING
 if TYPE_CHECKING:
     from .items import Item
     from .exchanges import Exchange
-
+    
 class UserBase(BaseModel):
     email: EmailStr
-
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    lon: Optional[float] = None
+    lat: Optional[float] = None
+    
 class UserCreate(UserBase):
     password: str
 

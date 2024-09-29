@@ -33,7 +33,14 @@ async def register_user(user: UserCreate, session: AsyncSession = Depends(get_se
             detail="Email is already registered",
         )
     hashed_password = get_password_hash(user.password)
-    db_user = User(email=user.email, hashed_password=hashed_password)  # Removed name here
+    db_user = User(
+        email=user.email,
+        hashed_password=hashed_password,
+        phone=user.phone,
+        address=user.address,
+        lon=user.lon,
+        lat=user.lat
+    )
     session.add(db_user)
     try:
         await session.commit()
