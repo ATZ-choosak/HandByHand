@@ -1,7 +1,8 @@
 import os
 import shutil
-from typing import List
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
+from typing import List, Optional
+import uuid
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -13,22 +14,62 @@ from ..models.user import User
 
 router = APIRouter()
 
-# Create a new item
 @router.post("/", response_model=ItemRead)
 async def create_item(
-    item: ItemCreate, 
-    session: AsyncSession = Depends(get_session), 
+    title: str = Form(...),
+    description: str = Form(...),
+    preferred_category_ids: str = Form(...),
+    images: List[UploadFile] = File(None),
+    session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    db_item = Item(**item.dict(), owner_id=current_user.id)
+    try:
+        category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid category IDs format")
+
+    # ตรวจสอบว่า category ที่ระบุมีอยู่จริง
+    result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+    existing_category_ids = set(result.scalars().all())
+    invalid_category_ids = set(category_ids) - existing_category_ids
+    
+    if invalid_category_ids:
+        raise HTTPException(status_code=400, detail=f"Invalid category IDs: {invalid_category_ids}")
+
+    db_item = Item(
+        title=title,
+        description=description,
+        preferred_category_ids=list(existing_category_ids),  # ใช้เฉพาะ category ที่มีอยู่จริง
+        owner_id=current_user.id
+    )
     session.add(db_item)
-    await session.commit()
-    await session.refresh(db_item)
-    # Create directory for the item images
+    await session.flush()
+
     item_directory = f"images/{current_user.id}/items/{db_item.id}"
     os.makedirs(item_directory, exist_ok=True)
-    return db_item
 
+    image_ids = []
+    image_urls = []
+
+    if images:
+        for image in images:
+            image_id = str(uuid.uuid4())
+            file_extension = os.path.splitext(image.filename)[1]
+            file_name = f"{image_id}{file_extension}"
+            file_location = f"{item_directory}/{file_name}"
+            
+            with open(file_location, "wb") as f:
+                f.write(await image.read())
+            
+            image_ids.append(image_id)
+            image_urls.append(file_location)
+
+    db_item.image_ids = image_ids
+    db_item.image_urls = image_urls
+
+    await session.commit()
+    await session.refresh(db_item)
+    return db_item
 # Get all items posted by the current user
 @router.get("/my-items", response_model=List[ItemRead])
 async def get_user_items(
@@ -84,32 +125,7 @@ async def update_item(
     await session.refresh(db_item)
     return db_item
 
-@router.post("/{item_id}/upload-images")
-async def upload_item_images(
-    item_id: int,
-    files: List[UploadFile] = File(...),
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch the item from the database
-    item = await session.get(Item, item_id)
-    if not item or item.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Item not found or you do not have permission to upload images for this item")
 
-    # Create directory for storing images if it doesn't exist
-    item_directory = f"images/{current_user.id}/items/{item_id}"
-    os.makedirs(item_directory, exist_ok=True)
-
-    # Save each file and update the item's image_urls
-    for file in files:
-        file_location = f"{item_directory}/{file.filename}"
-        with open(file_location, "wb") as f:
-            f.write(await file.read())
-        item.image_urls.append(file_location)
-
-    await session.commit()
-
-    return {"message": "Images uploaded successfully", "file_paths": item.image_urls}
 # Delete an item
 @router.delete("/{item_id}")
 async def delete_item(

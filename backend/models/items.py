@@ -11,8 +11,8 @@ class ItemBase(SQLModel):
     title: str
     description: Optional[str] = None
     preferred_category_ids: List[int] = Field(sa_column=Column(JSON), default_factory=list)  # New field
-    
-
+    image_ids: List[str] = Field(sa_column=Column(JSON), default_factory=list)
+    image_urls: List[str] = Field(sa_column=Column(JSON), default_factory=list)
 class ItemCreate(ItemBase):
     pass
 
