@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import os
+import uuid
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 from datetime import timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Optional
 from sqlmodel import select
 from pydantic import EmailStr
 
@@ -24,39 +26,67 @@ router = APIRouter()
 settings = get_settings()
 
 @router.post("/register", response_model=UserRead)
-async def register_user(user: UserCreate, session: AsyncSession = Depends(get_session)):
-    existing_user = await session.execute(select(User).where(User.email == user.email))
+async def register_user(
+    email: EmailStr,
+    password: str,
+    phone: Optional[str] = None,
+    address: Optional[str] = None,
+    lon: Optional[float] = None,
+    lat: Optional[float] = None,
+    profile_image: UploadFile = File(None),  # Change this line
+    session: AsyncSession = Depends(get_session)
+):
+    existing_user = await session.execute(select(User).where(User.email == email))
     existing_user = existing_user.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email is already registered",
         )
-    hashed_password = get_password_hash(user.password)
+
+    hashed_password = get_password_hash(password)
     db_user = User(
-        email=user.email,
+        email=email,
         hashed_password=hashed_password,
-        phone=user.phone,
-        address=user.address,
-        lon=user.lon,
-        lat=user.lat
+        phone=phone,
+        address=address,
+        lon=lon,
+        lat=lat,
     )
+
     session.add(db_user)
     try:
         await session.commit()
         await session.refresh(db_user)
+
+        # Handle profile image upload if provided
+        if profile_image:
+            user_directory = f"images/{db_user.id}"
+            profile_image_id = str(uuid.uuid4())  # สร้าง ID สำหรับรูปภาพโปรไฟล์
+            file_location = f"{user_directory}/{profile_image_id}.{profile_image.filename.split('.')[-1]}"
+            os.makedirs(user_directory, exist_ok=True)
+            file_location = f"{user_directory}/{profile_image.filename}"
+            with open(file_location, "wb") as f:
+                f.write(await profile_image.read())
+            db_user.profile_image_url = file_location
+            db_user.profile_image_id = profile_image_id
+            await session.commit()  # Commit the changes after updating the profile image URL
+
+        create_user_directory(db_user.id)
     except IntegrityError:
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="An error occurred during registration",
         )
+
     verification_token = create_access_token(
         data={"sub": db_user.email},
         expires_delta=timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
     )
     verification_url = f"{settings.BASE_URL}/auth/verify-email?token={verification_token}"
     await send_verification_email(db_user.email, verification_url)
+
     return db_user
 
 @router.get("/verify-email")

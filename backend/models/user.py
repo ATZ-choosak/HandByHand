@@ -1,3 +1,4 @@
+from fastapi import UploadFile
 from pydantic import BaseModel, EmailStr
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
@@ -15,7 +16,8 @@ class UserBase(BaseModel):
     address: Optional[str] = None
     lon: Optional[float] = None
     lat: Optional[float] = None
-    
+    profile_image_url: Optional[str] = None
+    profile_image_id: Optional[str] = None
 class UserCreate(UserBase):
     password: str
 
@@ -30,7 +32,8 @@ class User(SQLModel, UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
-    profile_image_url: Optional[str] = None  # New field for profile image
+    profile_image_url: Optional[str] = None
+    profile_image_id: Optional[str] = None  
     is_active: bool = Field(default=False)
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
