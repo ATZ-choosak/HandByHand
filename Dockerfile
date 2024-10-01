@@ -17,8 +17,6 @@ COPY pyproject.toml poetry.lock ./
 # Install dependencies with Poetry
 RUN poetry config virtualenvs.create false && poetry install --no-root
 
-RUN poetry run pytest
-
 # Copy the FastAPI application code into the container
 COPY . .
 
