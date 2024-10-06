@@ -65,30 +65,25 @@ async def update_me(
     if profile_image:
         user_directory = f"images/{current_user.id}"
         create_user_directory(current_user.id)
-        profile_image_id = str(uuid.uuid4())  # สร้าง ID สำหรับรูปภาพโปรไฟล์ใหม่
-        file_location = f"{user_directory}/{profile_image_id}.{profile_image.filename.split('.')[-1]}"
-
-        # Define the path for the old profile image if it exists
-        old_image_path = f"{user_directory}/{current_user.profile_image_url.split('/')[-1]}" if current_user.profile_image_url else None
+        profile_image_id = str(uuid.uuid4())
+        file_extension = os.path.splitext(profile_image.filename)[1]
+        file_name = f"{profile_image_id}{file_extension}"
+        file_location = f"{user_directory}/{file_name}"
 
         # Delete the old profile image if it exists
-        if old_image_path and os.path.exists(old_image_path):
-            os.remove(old_image_path)
-            print(f"Deleted old profile image: {old_image_path}")
+        if db_user.profile_image and os.path.exists(db_user.profile_image["url"]):
+            os.remove(db_user.profile_image["url"])
 
         # Save the new profile image
-        file_location = f"{user_directory}/{profile_image.filename}"
         with open(file_location, "wb") as f:
             f.write(await profile_image.read())
 
-        db_user.profile_image_url = file_location
-        db_user.profile_image_id = profile_image_id 
+        db_user.profile_image = {"id": profile_image_id, "url": file_location}
 
     session.add(db_user)
     await session.commit()
     await session.refresh(db_user)
     return db_user
-
 # Delete current user
 # @router.delete("/me")
 # async def delete_me(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):

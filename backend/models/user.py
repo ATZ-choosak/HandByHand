@@ -1,7 +1,8 @@
 from fastapi import UploadFile
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import Dict, Optional, List
 from datetime import datetime
 
 from typing import Optional, List, TYPE_CHECKING
@@ -16,14 +17,14 @@ class UserBase(BaseModel):
     address: Optional[str] = None
     lon: Optional[float] = None
     lat: Optional[float] = None
-    profile_image_url: Optional[str] = None
-    profile_image_id: Optional[str] = None
+    profile_image: Optional[Dict[str, str]] = Field(sa_column=Column(JSON), default=None) 
+
 class UserCreate(UserBase):
     password: str
 
 class UserRead(UserBase):
     id: int
-
+    profile_image: Optional[Dict[str, str]] = None
 class UserLoginInput(BaseModel):
     username: str
     password: str
@@ -33,8 +34,7 @@ class User(SQLModel, UserBase, table=True):
     name: str
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
-    profile_image_url: Optional[str] = None
-    profile_image_id: Optional[str] = None  
+    profile_image: Optional[Dict[str, str]] = Field(sa_column=Column(JSON), default=None) 
     is_active: bool = Field(default=False)
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)

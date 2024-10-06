@@ -70,8 +70,7 @@ async def register_user(
             file_location = f"{user_directory}/{profile_image.filename}"
             with open(file_location, "wb") as f:
                 f.write(await profile_image.read())
-            db_user.profile_image_url = file_location
-            db_user.profile_image_id = profile_image_id
+            db_user.profile_image = {"id": profile_image_id, "url": file_location}
             await session.commit()  # Commit the changes after updating the profile image URL
 
         create_user_directory(db_user.id)

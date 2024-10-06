@@ -1,4 +1,5 @@
 import os
+import uuid
 from fastapi import APIRouter, Form, UploadFile, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -39,33 +40,35 @@ async def create_category(
     
     return new_category
 
-@router.post("/categories/{category_id}/upload-image")
+@router.post("/categories/{category_id}/upload-image", response_model=Category)
 async def upload_category_image(
     category_id: int,
     file: UploadFile,
     session: AsyncSession = Depends(get_session)
 ):
-    # ตรวจสอบว่า Category มีอยู่หรือไม่
     category = await session.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
-    
-    # สร้างโฟลเดอร์ถ้ายังไม่มี
+
     category_directory = f"images/categories/{category_id}"
-    create_directory_if_not_exists(category_directory)
+    os.makedirs(category_directory, exist_ok=True)
 
-    # ลบรูปภาพเก่าออกถ้ามี
-    if category.image_url:
-        delete_old_image(category.image_url)
+    image_id = str(uuid.uuid4())
+    file_extension = os.path.splitext(file.filename)[1]
+    file_name = f"{image_id}{file_extension}"
+    file_location = f"{category_directory}/{file_name}"
 
-    # บันทึกไฟล์รูปภาพใหม่ลงในโฟลเดอร์ที่สร้าง
-    file_location = f"{category_directory}/{file.filename}"
+    # Delete the old image if it exists
+    if category.image and os.path.exists(category.image["url"]):
+        os.remove(category.image["url"])
+
+    # Save the new image
     with open(file_location, "wb+") as file_object:
-        file_object.write(file.file.read())
+        file_object.write(await file.read())
 
-    # อัปเดต URL ของรูปภาพใน Category
-    category.image_url = file_location
+    category.image = {"id": image_id, "url": file_location}
+
     session.add(category)
     await session.commit()
-
-    return {"message": "Image uploaded successfully", "file_path": file_location}
+    await session.refresh(category)
+    return category
