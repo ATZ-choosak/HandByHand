@@ -1,6 +1,7 @@
 import os
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 from datetime import timedelta
@@ -135,13 +136,18 @@ async def login_for_access_token(
             detail="Email not verified",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    is_first_login = user.is_first_login
+    if is_first_login:
+        user.is_first_login = False
+        await session.commit()
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
-    
+    return {"access_token": access_token, "token_type": "bearer", "is_first_login": is_first_login}
 @router.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     user = await session.execute(select(User).where(User.email == form_data.username))
@@ -158,13 +164,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Email not verified",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    is_first_login = user.is_first_login
+    if is_first_login:
+        user.is_first_login = False
+        await session.commit()
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
-
+    return {"access_token": access_token, "token_type": "bearer", "is_first_login": is_first_login}
 @router.post("/password-reset/request")
 async def request_password_reset(
     email: str = Form(...),
@@ -175,12 +186,13 @@ async def request_password_reset(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email not found")
     reset_token = create_password_reset_token(user.email)
-    reset_url = f"{settings.BASE_URL}/reset-password?token={reset_token}"
+    reset_url = f"{settings.BASE_URL}/auth/reset-password?token={reset_token}"
     await send_password_reset_email(user.email, reset_url)
     return {"message": "Password reset email sent"}
 
 @router.post("/password-reset/reset")
 async def reset_password(
+    request: Request,
     token: str = Form(...),
     new_password: str = Form(...),
     session: AsyncSession = Depends(get_session)
@@ -197,10 +209,9 @@ async def reset_password(
         hashed_password = get_password_hash(new_password)
         user.hashed_password = hashed_password
         await session.commit()
-        return {"message": "Password reset successful"}
+        return templates.TemplateResponse("password_reset_success.html", {"request": request})
     except JWTError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
-
 @router.post("/resend-verification")
 async def resend_verification_link(
     email: str = Form(...),
@@ -216,3 +227,9 @@ async def resend_verification_link(
     verification_url = f"{settings.BASE_URL}/auth/verify-email?token={verification_token}"
     await send_verification_email(user.email, verification_url)
     return {"message": "Verification email resent successfully"}
+
+templates = Jinja2Templates(directory="backend/template")
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str):
+    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})

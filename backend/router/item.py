@@ -4,14 +4,15 @@ import shutil
 from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-
+from sqlalchemy.orm import joinedload
 from backend.models.category import Category
-from ..models.items import Item, ItemCreate, ItemRead
+from ..models.items import Item, ItemCreate, ItemRead, PaginatedItemResponse
 from ..db import get_session
 from ..utils.auth import get_current_user
-from ..models.user import User
+from ..models.user import OwnerInfo, User
 
 router = APIRouter()
 
@@ -88,39 +89,88 @@ async def create_item(
 # Get all items posted by the current user
 @router.get("/my-items", response_model=List[ItemRead])
 async def get_user_items(
-    session: AsyncSession = Depends(get_session), 
+    session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    result = await session.execute(select(Item).where(Item.owner_id == current_user.id))
+    result = await session.execute(
+        select(Item).options(joinedload(Item.owner)).where(Item.owner_id == current_user.id)
+    )
     items = result.scalars().all()
-    return items
-
+    return [
+        ItemRead(
+            **{k: v for k, v in item.__dict__.items() if k != 'owner'},
+            owner=item.owner.owner_info
+        ) for item in items
+    ]
 # Get all items (optionally with search query)
-@router.get("/", response_model=List[ItemRead])
+@router.get("/", response_model=PaginatedItemResponse)
 async def get_items(
-    session: AsyncSession = Depends(get_session), 
-    query: str = Query(None, min_length=3, description="Search query for items")
+    session: AsyncSession = Depends(get_session),
+    query: str = Query(None, min_length=3, description="Search query for items"),
+    page: int = Query(1, ge=1, description="Page number"),
+    items_per_page: int = Query(10, ge=1, le=100, description="Items per page")
 ):
-    statement = select(Item)
-    
+    statement = select(Item).options(joinedload(Item.owner))
     if query:
         statement = statement.where(Item.title.ilike(f"%{query}%"))
     
+    # Count total items
+    count_statement = select(func.count()).select_from(Item)
+    if query:
+        count_statement = count_statement.where(Item.title.ilike(f"%{query}%"))
+    total_items = await session.execute(count_statement)
+    total_items = total_items.scalar_one()
+
+    # Apply pagination
+    offset = (page - 1) * items_per_page
+    statement = statement.offset(offset).limit(items_per_page)
+
     result = await session.execute(statement)
     items = result.scalars().all()
-    return items
-
+    
+    return PaginatedItemResponse(
+        items=[
+            ItemRead(
+                **{k: v for k, v in item.__dict__.items() if k != 'owner'},
+                owner=OwnerInfo(
+                    id=item.owner.id,
+                    email=item.owner.email,
+                    phone=item.owner.phone,
+                    profile_image=item.owner.profile_image
+                )
+            ) for item in items
+        ],
+        total_items=total_items,
+        page=page,
+        items_per_page=items_per_page,
+        total_pages=(total_items + items_per_page - 1) // items_per_page
+    )
 # Get item by ID
 @router.get("/{item_id}", response_model=ItemRead)
 async def get_item(
-    item_id: int, 
+    item_id: int,
     session: AsyncSession = Depends(get_session)
 ):
-    item = await session.get(Item, item_id)
+    result = await session.execute(
+        select(Item).options(joinedload(Item.owner)).where(Item.id == item_id)
+    )
+    item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-    return item
-
+    
+    # Create a dictionary with all item attributes except 'owner'
+    item_dict = {k: v for k, v in item.__dict__.items() if k != 'owner'}
+    
+    # Create the ItemRead instance
+    return ItemRead(
+        **item_dict,
+        owner=OwnerInfo(
+            id=item.owner.id,
+            email=item.owner.email,
+            phone=item.owner.phone,
+            profile_image=item.owner.profile_image
+        )
+    )
 # Update an existing item
 @router.put("/items/{item_id}")
 async def update_item(
@@ -167,7 +217,15 @@ async def update_item(
 
     await session.commit()
     await session.refresh(db_item)
-    return db_item
+    return ItemRead(
+        **{k: v for k, v in db_item.__dict__.items() if k != 'owner'},
+        owner=OwnerInfo(
+            id=db_item.owner.id,
+            email=db_item.owner.email,
+            phone=db_item.owner.phone,
+            profile_image=db_item.owner.profile_image
+        )
+    )
 
 
 # Delete an item
