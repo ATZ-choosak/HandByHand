@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Literal, Optional, List
 from datetime import datetime
 from .messages import Message
 
@@ -13,3 +13,12 @@ class Chat(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+# เพิ่ม Pydantic models สำหรับ request bodies
+class CreateChatRequest(BaseModel):
+    user: int
+
+class SendMessageRequest(BaseModel):
+    chat_id: str
+    message: str
+    message_type: Literal['text', 'image', 'file']

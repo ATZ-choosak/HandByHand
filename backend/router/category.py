@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, UploadFile, Depends, HTTPException
+from fastapi import APIRouter, Form, UploadFile, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -24,7 +24,10 @@ async def get_categories(session: AsyncSession = Depends(get_session)):
     return categories
 
 @router.post("/categories", response_model=Category)
-async def create_category(name: str, session: AsyncSession = Depends(get_session)):
+async def create_category(
+    name: str = Form(...),
+    session: AsyncSession = Depends(get_session)
+):
     new_category = Category(name=name)
     session.add(new_category)
     await session.commit()

@@ -122,20 +122,49 @@ async def get_item(
     return item
 
 # Update an existing item
-@router.put("/{item_id}", response_model=ItemRead)
+@router.put("/items/{item_id}")
 async def update_item(
-    item_id: int, 
-    item: ItemCreate, 
-    session: AsyncSession = Depends(get_session), 
-    current_user: User = Depends(get_current_user)
+    item_id: int,
+    title: str = Form(...),
+    description: str = Form(None),
+    category_id: int = Form(...),
+    preferred_category_ids: str = Form(...),
+    is_exchangeable: bool = Form(...),
+    require_all_categories: bool = Form(...),
+    address: str = Form(None),
+    lon: float = Form(None),
+    lat: float = Form(None),
+    images: List[UploadFile] = File(None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
 ):
     db_item = await session.get(Item, item_id)
     if not db_item or db_item.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found or you do not have permission to update it")
-    
-    db_item.title = item.title
-    db_item.description = item.description
-    
+        raise HTTPException(status_code=404, detail="Item not found or you don't have permission")
+
+    # อัปเดตข้อมูล
+    db_item.title = title
+    db_item.description = description
+    db_item.category_id = category_id
+    db_item.preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
+    db_item.is_exchangeable = is_exchangeable
+    db_item.require_all_categories = require_all_categories
+    db_item.address = address
+    db_item.lon = lon
+    db_item.lat = lat
+
+    # จัดการกับรูปภาพใหม่
+    if images:
+        images_data = []
+        for image in images:
+            image_id = str(uuid.uuid4())
+            file_location = f"images/{current_user.id}/items/{db_item.id}/{image_id}{os.path.splitext(image.filename)[1]}"
+            os.makedirs(os.path.dirname(file_location), exist_ok=True)
+            with open(file_location, "wb+") as file_object:
+                file_object.write(await image.read())
+            images_data.append({"id": image_id, "url": file_location})
+        db_item.images = images_data
+
     await session.commit()
     await session.refresh(db_item)
     return db_item

@@ -1,6 +1,6 @@
 import os
 import uuid
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -38,13 +38,13 @@ async def get_users(session: AsyncSession = Depends(get_session), current_user: 
 # Update current user's information
 @router.put("/me", response_model=UserRead)
 async def update_me(
-    email: EmailStr,
-    phone: Optional[str] = None,
-    address: Optional[str] = None,
-    lon: Optional[float] = None,
-    lat: Optional[float] = None,
+    email: EmailStr = Form(...),
+    phone: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    lon: Optional[float] = Form(None),
+    lat: Optional[float] = Form(None),
     profile_image: UploadFile = File(None),
-    password: Optional[str] = None,
+    password: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):

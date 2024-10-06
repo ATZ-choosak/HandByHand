@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter,status, Body, Depends, Form, HTTPException
 from bson import ObjectId
 from typing import Literal, List, Dict, Any
 from datetime import datetime
+from requests import session
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models.chats import CreateChatRequest, SendMessageRequest
 
 from ..models.user import User
 from ..models.messages import Message
@@ -17,113 +20,114 @@ async def get_chat_sessions(
     session: AsyncSession = Depends(get_session)
 ) -> List[Dict[str, Any]]:
     collection = get_db().get_collection("chats")
-    
-    # Find all chat sessions where the current user is either user1 or user2
     chats_cursor = collection.find({
         "$or": [
             {"user1": current_user.id},
             {"user2": current_user.id}
         ],
     })
-
+    
     if chats_cursor is None:
         return []
     
     chat_list = []
-
     for chat in chats_cursor:
-
-        if chat["user1"] == current_user.id: # type: ignore
-            user = await session.get(User, chat["user2"]) # type: ignore
-
-        if chat["user2"] == current_user.id: # type: ignore
-            user = await session.get(User, chat["user1"]) # type: ignore
-
-        chat_list.append({
-            "_id": str(chat["_id"]),  # Convert ObjectId to string for JSON serialization # type: ignore
-            "user" : {
-                "name" : user.name
+        other_user_id = chat["user2"] if chat["user1"] == current_user.id else chat["user1"]
+        other_user = await session.get(User, other_user_id)
+        
+        chat_info = {
+            "_id": str(chat["_id"]),
+            "user": {
+                "id": other_user_id,
+                "name": other_user.name if other_user else "Unknown User",
+                "email": other_user.email if other_user else None
             }
-        })
-
+        }
+        chat_list.append(chat_info)
+    
     return chat_list
 
 @router.post("", response_model=dict)
 async def create_chat(
-    user: int,
-    current_user: User = Depends(get_current_user)
+    chat_request: CreateChatRequest = Body(...),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
 ):
-    collection = get_db().get_collection("chats")
+    # ตรวจสอบว่า user_id ที่ระบุมีอยู่จริง
+    target_user = await session.get(User, chat_request.user)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id {chat_request.user} not found"
+        )
 
+    collection = get_db().get_collection("chats")
+    
     # Check if a chat session already exists
     existing_chat = collection.find_one({
         "$or": [
-            {"user1": current_user.id, "user2": user},
-            {"user1": user, "user2": current_user.id}
+            {"user1": current_user.id, "user2": chat_request.user},
+            {"user1": chat_request.user, "user2": current_user.id}
         ]
     })
-
+    
     if existing_chat:
-        return {"message": "Chat session already exists.", "chat_id": str(existing_chat["_id"])} # type: ignore
-
+        return {"message": "Chat session already exists.", "chat_id": str(existing_chat["_id"])}
+    
     # Create a new chat session
-    chat_data = dict()
-    chat_data["user1"] = current_user.id
-    chat_data["user2"] = user
-    chat_data["messages"] = []  # Initialize messages as an empty array
+    chat_data = {
+        "user1": current_user.id,
+        "user2": chat_request.user,
+        "messages": []  # Initialize messages as an empty array
+    }
     result = collection.insert_one(chat_data)
-
     return {"message": "Chat session created successfully.", "chat_id": str(result.inserted_id)}
-
-
 @router.post("/send_message", response_model=Message)
 async def send_message(
-    chat_id: str,
-    message: str,
-    message_type: Literal['text', 'image', 'file'],
+    message_request: SendMessageRequest = Body(...),
     current_user: User = Depends(get_current_user)
 ):
     collection = get_db().get_collection("chats")
-
+    
     # Convert chat_id to ObjectId
     try:
-        chat_object_id = ObjectId(chat_id)
+        chat_object_id = ObjectId(message_request.chat_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid chat ID format: {str(e)}")
-
+    
     # Verify the chat exists
     chat = collection.find_one({"_id": chat_object_id})
     if chat is None:
-        raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
-
+        raise HTTPException(status_code=404, detail=f"Chat session with ID {message_request.chat_id} not found")
+    
     # Check if the current user is part of the chat
-    if chat["user1"] != current_user.id and chat["user2"] != current_user.id: # type: ignore
+    if chat["user1"] != current_user.id and chat["user2"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to send message in this chat")
-
+    
     # Ensure the messages field is an array
     if chat.get("messages") is None:
-        chat["messages"] = [] # type: ignore
-
+        chat["messages"] = []
+    
     # Add the message to the chat
     message_data = {
         "sender": current_user.id,
-        "receiver": chat["user2"] if chat["user1"] == current_user.id else chat["user1"], # type: ignore
-        "message": message,
+        "receiver": chat["user2"] if chat["user1"] == current_user.id else chat["user1"],
+        "message": message_request.message,
         "timestamp": datetime.utcnow(),
-        "message_type": message_type
+        "message_type": message_request.message_type
     }
+    
     chat_update = {"$push": {"messages": message_data}}
     result = collection.update_one({"_id": chat_object_id}, chat_update)
-
+    
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found after update")
-
+        raise HTTPException(status_code=404, detail=f"Chat session with ID {message_request.chat_id} not found after update")
+    
     # Retrieve the updated chat to return the message
     updated_chat = collection.find_one({"_id": chat_object_id})
     if not updated_chat:
-        raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
-
-
+        raise HTTPException(status_code=404, detail=f"Chat session with ID {message_request.chat_id} not found")
+    
     return message_data
 
 @router.get("/messages/{chat_id}", response_model=List[Dict[str, Any]])
@@ -133,35 +137,35 @@ async def get_messages_by_chat_id(
     session: AsyncSession = Depends(get_session)
 ) -> List[Dict[str, Any]]:
     collection = get_db().get_collection("chats")
-
+    
     # Convert chat_id to ObjectId
     try:
         chat_object_id = ObjectId(chat_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid chat ID format: {str(e)}")
-
+    
     # Find the chat session by chat_id
     chat = collection.find_one({"_id": chat_object_id})
     if chat is None:
         raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
-
+    
     # Check if the current user is part of the chat
-    if chat["user1"] != current_user.id and chat["user2"] != current_user.id: # type: ignore
+    if chat["user1"] != current_user.id and chat["user2"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view messages in this chat")
-
+    
     # Retrieve the messages from the chat
     messages = chat.get("messages", [])
-
+    
     # Replace sender and receiver IDs with names
     for msg in messages:
-        sender = await session.get(User, msg["sender"]) # type: ignore
-        receiver = await session.get(User, msg["receiver"]) # type: ignore
-
-        msg["sender_name"] = sender.name # type: ignore
-        msg["receiver_name"] = receiver.name # type: ignore
-
+        sender = await session.get(User, msg["sender"])
+        receiver = await session.get(User, msg["receiver"])
+        
+        msg["sender_name"] = sender.email if sender else "Unknown User"
+        msg["receiver_name"] = receiver.email if receiver else "Unknown User"
+        
         # Add a flag to indicate if the sender or receiver is the current user
-        msg["sender_is_me"] = sender.id == current_user.id # type: ignore
-        msg["receiver_is_me"] = receiver.id == current_user.id # type: ignore
-
+        msg["sender_is_me"] = sender.id == current_user.id if sender else False
+        msg["receiver_is_me"] = receiver.id == current_user.id if receiver else False
+    
     return messages

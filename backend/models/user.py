@@ -30,6 +30,7 @@ class UserLoginInput(BaseModel):
 
 class User(SQLModel, UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
     profile_image_url: Optional[str] = None
