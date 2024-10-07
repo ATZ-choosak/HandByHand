@@ -1,7 +1,7 @@
 import os
 import re
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Union
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from sqlalchemy import func
@@ -28,8 +28,7 @@ async def create_item(
     address: Optional[str] = Form(None),
     lon: Optional[float] = Form(None),
     lat: Optional[float] = Form(None),
-    images: Optional[List[UploadFile]] = File(None),
-    session: AsyncSession = Depends(get_session),
+images: Union[UploadFile, List[UploadFile]] = File(None),    session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     if preferred_category_ids:
@@ -72,19 +71,21 @@ async def create_item(
     os.makedirs(item_directory, exist_ok=True)
 
     images_data = []
-
     if images:
-        for image in images:
+        if isinstance(images, list):
+            image_files = images
+        else:
+            image_files = [images]
+        
+        for image in image_files:
             image_id = str(uuid.uuid4())
             file_extension = os.path.splitext(image.filename)[1]
             file_name = f"{image_id}{file_extension}"
             file_location = f"{item_directory}/{file_name}"
-            
             with open(file_location, "wb") as f:
                 f.write(await image.read())
-            
             images_data.append({"id": image_id, "url": file_location})
-
+    
     db_item.images = images_data
 
     await session.commit()
