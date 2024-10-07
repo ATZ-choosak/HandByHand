@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 from .user import OwnerInfo
 if TYPE_CHECKING:
@@ -24,6 +24,7 @@ class ItemCreate(ItemBase):
 
 class ItemRead(ItemBase):
     id: int
+    category: Dict[str, Any] = {"id": int, "name": str}
     owner: OwnerInfo
 
     class Config:
@@ -45,3 +46,5 @@ class Item(ItemBase, table=True):
     exchanges_requested: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.requested_item_id"})
     exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
     category: Optional["Category"] = Relationship(back_populates="items")  # เพิ่ม relationship นี้
+    category: "Category" = Relationship()
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id")
