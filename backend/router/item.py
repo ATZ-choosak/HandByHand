@@ -1,7 +1,7 @@
 import os
 import re
 import shutil
-from typing import List, Optional, Union
+from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from sqlalchemy import func
@@ -28,7 +28,8 @@ async def create_item(
     address: Optional[str] = Form(None),
     lon: Optional[float] = Form(None),
     lat: Optional[float] = Form(None),
-images: Union[UploadFile, List[UploadFile]] = File(None),    session: AsyncSession = Depends(get_session),
+    images: List[UploadFile] = File(default=None),
+    session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     if preferred_category_ids:
@@ -72,22 +73,18 @@ images: Union[UploadFile, List[UploadFile]] = File(None),    session: AsyncSessi
 
     images_data = []
     if images:
-        if isinstance(images, list):
-            image_files = images
-        else:
-            image_files = [images]
-        
-        for image in image_files:
+        for image in images:
             image_id = str(uuid.uuid4())
             file_extension = os.path.splitext(image.filename)[1]
             file_name = f"{image_id}{file_extension}"
             file_location = f"{item_directory}/{file_name}"
+            
             with open(file_location, "wb") as f:
                 f.write(await image.read())
+            
             images_data.append({"id": image_id, "url": file_location})
-    
-    db_item.images = images_data
 
+    db_item.images = images_data
     await session.commit()
     await session.refresh(db_item)
     # Fetch preferred categories
