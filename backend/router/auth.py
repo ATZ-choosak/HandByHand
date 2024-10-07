@@ -118,13 +118,12 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
     
 @router.post("/login")
 async def login_for_access_token(
-    username: str = Form(...),
-    password: str = Form(...),
+    user_input : UserLoginInput,
     session: AsyncSession = Depends(get_session)
 ):
-    user = await session.execute(select(User).where(User.email == username))
+    user = await session.execute(select(User).where(User.email == user_input.username))
     user = user.scalar_one_or_none()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(user_input.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
