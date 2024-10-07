@@ -38,6 +38,7 @@ class UserRead(UserBase):
     lat: Optional[float] = None
     profile_image: Optional[Dict[str, str]] = None
     is_verified: bool
+    is_first_login: bool
     created_at: datetime
     updated_at: datetime
     

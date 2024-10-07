@@ -170,7 +170,7 @@ async def get_item(
         **item_dict,
         owner=OwnerInfo(
             id=item.owner.id,
-            email=item.owner.email,
+            name=item.owner.name,
             phone=item.owner.phone,
             profile_image=item.owner.profile_image
         )
