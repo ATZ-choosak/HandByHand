@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from sqlalchemy.orm import joinedload
 from backend.models.category import Category
-from ..models.items import Item, ItemCreate, ItemRead, PaginatedItemResponse
+from ..models.items import CategoryInfo, Item, ItemCreate, ItemRead, PaginatedItemResponse
 from ..db import get_session
 from ..utils.auth import get_current_user
 from ..models.user import OwnerInfo, User
@@ -89,23 +89,28 @@ async def create_item(
 
     await session.commit()
     await session.refresh(db_item)
-    # โหลด Item พร้อมกับ category และ owner
-    stmt = select(Item).options(selectinload(Item.category), selectinload(Item.owner)).where(Item.id == db_item.id)
-    result = await session.execute(stmt)
-    item = result.scalar_one()
+    # Fetch preferred categories
+    preferred_categories = await session.execute(
+        select(Category).where(Category.id.in_(db_item.preferred_category_ids))
+    )
+    preferred_categories = preferred_categories.scalars().all()
 
     return ItemRead(
-        **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
+        **{k: v for k, v in db_item.__dict__.items() if k not in ['owner', 'category']},
         owner=OwnerInfo(
-            id=item.owner.id,
-            name=item.owner.name,
-            phone=item.owner.phone,
-            profile_image=item.owner.profile_image
+            id=db_item.owner.id,
+            name=db_item.owner.name,
+            phone=db_item.owner.phone,
+            profile_image=db_item.owner.profile_image
         ),
-        category={
-            "id": item.category.id if item.category else None,
-            "name": item.category.name if item.category else None
-        }
+        category=CategoryInfo(
+            id=db_item.category.id,
+            name=db_item.category.name
+        ) if db_item.category else None,
+        preferred_category=[
+            CategoryInfo(id=cat.id, name=cat.name)
+            for cat in preferred_categories
+        ]
     )
 
 
@@ -121,18 +126,28 @@ async def get_user_items(
         .where(Item.owner_id == current_user.id)
     )
     items = result.scalars().all()
-    return [
-        ItemRead(
+
+    item_reads = []
+    for item in items:
+        preferred_categories = await session.execute(
+            select(Category).where(Category.id.in_(item.preferred_category_ids))
+        )
+        preferred_categories = preferred_categories.scalars().all()
+
+        item_reads.append(ItemRead(
             **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
             owner=item.owner.owner_info,
-            category={
-                "id": item.category.id if item.category else None,
-                "name": item.category.name if item.category else None
-            }
-        )
-        for item in items
-    ]
+            category=CategoryInfo(
+                id=item.category.id,
+                name=item.category.name
+            ) if item.category else None,
+            preferred_category=[
+                CategoryInfo(id=cat.id, name=cat.name)
+                for cat in preferred_categories
+            ]
+        ))
 
+    return item_reads
 # Get all items (optionally with search query)
 @router.get("/", response_model=PaginatedItemResponse)
 async def get_items(
@@ -158,23 +173,33 @@ async def get_items(
     result = await session.execute(statement)
     items = result.scalars().all()
 
+    items_with_preferred_categories = []
+    for item in items:
+        preferred_categories = await session.execute(
+            select(Category).where(Category.id.in_(item.preferred_category_ids))
+        )
+        preferred_categories = preferred_categories.scalars().all()
+
+        items_with_preferred_categories.append(ItemRead(
+            **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
+            owner=OwnerInfo(
+                id=item.owner.id,
+                name=item.owner.name,
+                phone=item.owner.phone,
+                profile_image=item.owner.profile_image
+            ),
+            category=CategoryInfo(
+                id=item.category.id,
+                name=item.category.name
+            ) if item.category else None,
+            preferred_category=[
+                CategoryInfo(id=cat.id, name=cat.name)
+                for cat in preferred_categories
+            ]
+        ))
+
     return PaginatedItemResponse(
-        items=[
-            ItemRead(
-                **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
-                owner=OwnerInfo(
-                    id=item.owner.id,
-                    name=item.owner.name,
-                    phone=item.owner.phone,
-                    profile_image=item.owner.profile_image
-                ),
-                category={
-                    "id": item.category.id if item.category else None,
-                    "name": item.category.name if item.category else None
-                }
-            )
-            for item in items
-        ],
+        items=items_with_preferred_categories,
         total_items=total_items,
         page=page,
         items_per_page=items_per_page,
@@ -186,7 +211,6 @@ async def get_item(
     item_id: int,
     session: AsyncSession = Depends(get_session)
 ):
-    # Use selectinload instead of joinedload for async operations
     stmt = select(Item).options(selectinload(Item.owner), selectinload(Item.category)).where(Item.id == item_id)
     result = await session.execute(stmt)
     item = result.scalar_one_or_none()
@@ -194,7 +218,12 @@ async def get_item(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
-    # Create the ItemRead instance
+    # Fetch preferred categories
+    preferred_categories = await session.execute(
+        select(Category).where(Category.id.in_(item.preferred_category_ids))
+    )
+    preferred_categories = preferred_categories.scalars().all()
+
     return ItemRead(
         **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
         owner=OwnerInfo(
@@ -203,19 +232,27 @@ async def get_item(
             phone=item.owner.phone,
             profile_image=item.owner.profile_image
         ),
-        category={
-            "id": item.category.id if item.category else None,
-            "name": item.category.name if item.category else None
-        }
+        category=CategoryInfo(
+            id=item.category.id,
+            name=item.category.name
+        ) if item.category else None,
+        preferred_category=[
+            CategoryInfo(id=cat.id, name=cat.name)
+            for cat in preferred_categories
+        ]
     )
 # Update an existing item
-@router.put("/items/{item_id}")
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+@router.put("/items/{item_id}", response_model=ItemRead)
 async def update_item(
     item_id: int,
     title: str = Form(...),
     description: str = Form(None),
     category_id: int = Form(...),
-    preferred_category_ids: str = Form(...),
+    preferred_category_ids: Optional[str] = Form(None),
     is_exchangeable: bool = Form(...),
     require_all_categories: bool = Form(...),
     address: str = Form(None),
@@ -225,15 +262,19 @@ async def update_item(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
-    db_item = await session.get(Item, item_id)
-    if not db_item or db_item.owner_id != current_user.id:
+    stmt = select(Item).options(selectinload(Item.owner), selectinload(Item.category)).where(Item.id == item_id, Item.owner_id == current_user.id)
+    result = await session.execute(stmt)
+    db_item = result.scalar_one_or_none()
+
+    if not db_item:
         raise HTTPException(status_code=404, detail="Item not found or you don't have permission")
 
     # อัปเดตข้อมูล
     db_item.title = title
     db_item.description = description
     db_item.category_id = category_id
-    db_item.preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
+    if preferred_category_ids:
+        db_item.preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
     db_item.is_exchangeable = is_exchangeable
     db_item.require_all_categories = require_all_categories
     db_item.address = address
@@ -252,16 +293,35 @@ async def update_item(
             images_data.append({"id": image_id, "url": file_location})
         db_item.images = images_data
 
+    session.add(db_item)
     await session.commit()
     await session.refresh(db_item)
+
+    # Fetch preferred categories
+    if db_item.preferred_category_ids:
+        preferred_categories = await session.execute(
+            select(Category).where(Category.id.in_(db_item.preferred_category_ids))
+        )
+        preferred_categories = preferred_categories.scalars().all()
+    else:
+        preferred_categories = []
+
     return ItemRead(
-        **{k: v for k, v in db_item.__dict__.items() if k != 'owner'},
+        **{k: v for k, v in db_item.__dict__.items() if k not in ['owner', 'category']},
         owner=OwnerInfo(
             id=db_item.owner.id,
-            email=db_item.owner.email,
+            name=db_item.owner.name,
             phone=db_item.owner.phone,
             profile_image=db_item.owner.profile_image
-        )
+        ),
+        category=CategoryInfo(
+            id=db_item.category.id,
+            name=db_item.category.name
+        ) if db_item.category else None,
+        preferred_category=[
+            CategoryInfo(id=cat.id, name=cat.name)
+            for cat in preferred_categories
+        ]
     )
 
 
@@ -313,30 +373,3 @@ async def delete_item_image(
     
     return {"message": "Image deleted successfully"}
 
-@router.put("/{item_id}/set-preferred-categories", response_model=ItemRead)
-async def set_preferred_categories(
-    item_id: int,
-    category_ids: List[int],
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch the item from the database
-    db_item = await session.get(Item, item_id)
-    if not db_item or db_item.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Item not found or you do not have permission to update it")
-
-    # Validate category IDs
-    result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
-    valid_category_ids = set(result.scalars().all())
-    invalid_category_ids = set(category_ids) - valid_category_ids
-    
-    if invalid_category_ids:
-        raise HTTPException(status_code=400, detail=f"Invalid category IDs: {invalid_category_ids}")
-
-    # Update preferred categories
-    db_item.preferred_category_ids = list(valid_category_ids)
-    
-    await session.commit()
-    await session.refresh(db_item)
-
-    return db_item
