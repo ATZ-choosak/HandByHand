@@ -43,6 +43,8 @@ async def submit_customer_interest(
     # Otherwise, create a new entry
     new_interest = CustomerInterest(user_id=current_user.id, category_ids=category_ids)
     session.add(new_interest)
+    # Set is_first_login to True
+    current_user.is_first_login = True
     await session.commit()
     return {"message": "Customer interests saved successfully"}
 # Route to fetch the customer interests for the current user

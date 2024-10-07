@@ -93,7 +93,7 @@ async def verify_email(token: str, request: Request, session: AsyncSession = Dep
     
 @router.post("/login")
 async def login_for_access_token(
-    user_input : UserLoginInput,
+    user_input: UserLoginInput,
     session: AsyncSession = Depends(get_session)
 ):
     user = await session.execute(select(User).where(User.email == user_input.username))
@@ -104,24 +104,23 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     if not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email not verified",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    is_first_login = user.is_first_login
-    if is_first_login:
-        user.is_first_login = False
-        await session.commit()
+
+
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer", "is_first_login": is_first_login}
+
+    return {"access_token": access_token, "token_type": "bearer", "is_first_login": user.is_first_login}
 @router.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     user = await session.execute(select(User).where(User.email == form_data.username))
@@ -132,6 +131,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     if not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -139,17 +139,14 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    is_first_login = user.is_first_login
-    if is_first_login:
-        user.is_first_login = False
-        await session.commit()
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer", "is_first_login": is_first_login}
+
+    return {"access_token": access_token, "token_type": "bearer", "is_first_login": user.is_first_login}
 @router.post("/password-reset/request")
 async def request_password_reset(
     email: str = Form(...),

@@ -57,7 +57,7 @@ class User(SQLModel, UserBase, table=True):
     profile_image: Optional[Dict[str, str]] = Field(sa_column=Column(JSON), default=None) 
     is_active: bool = Field(default=False)
     is_verified: bool = Field(default=False)
-    is_first_login: bool = Field(default=True)
+    is_first_login: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     items: List["Item"] = Relationship(back_populates="owner")
