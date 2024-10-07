@@ -49,7 +49,7 @@ class UserLoginInput(BaseModel):
 
 class User(SQLModel, UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: Optional[str] = None
     email: EmailStr = Field(unique=True, index=True)
     hashed_password: str
     profile_image: Optional[Dict[str, str]] = Field(sa_column=Column(JSON), default=None) 
