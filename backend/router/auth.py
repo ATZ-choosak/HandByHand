@@ -30,12 +30,6 @@ settings = get_settings()
 async def register_user(
     email: EmailStr = Form(...),
     password: str = Form(...),
-    name: str = Form(...),
-    phone: Optional[str] = Form(None),
-    address: Optional[str] = Form(None),
-    lon: Optional[float] = Form(None),
-    lat: Optional[float] = Form(None),
-    profile_image: UploadFile = File(None),
     session: AsyncSession = Depends(get_session)
 ):
     existing_user = await session.execute(select(User).where(User.email == email))
@@ -49,31 +43,13 @@ async def register_user(
     hashed_password = get_password_hash(password)
     db_user = User(
         email=email,
-        name=name,
         hashed_password=hashed_password,
-        phone=phone,
-        address=address,
-        lon=lon,
-        lat=lat,
     )
 
     session.add(db_user)
     try:
         await session.commit()
         await session.refresh(db_user)
-
-        # Handle profile image upload if provided
-        if profile_image:
-            user_directory = f"images/{db_user.id}"
-            profile_image_id = str(uuid.uuid4())  # สร้าง ID สำหรับรูปภาพโปรไฟล์
-            file_location = f"{user_directory}/{profile_image_id}.{profile_image.filename.split('.')[-1]}"
-            os.makedirs(user_directory, exist_ok=True)
-            file_location = f"{user_directory}/{profile_image.filename}"
-            with open(file_location, "wb") as f:
-                f.write(await profile_image.read())
-            db_user.profile_image = {"id": profile_image_id, "url": file_location}
-            await session.commit()  # Commit the changes after updating the profile image URL
-
         create_user_directory(db_user.id)
     except IntegrityError:
         await session.rollback()

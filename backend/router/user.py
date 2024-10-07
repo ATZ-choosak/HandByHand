@@ -38,13 +38,12 @@ async def get_users(session: AsyncSession = Depends(get_session), current_user: 
 # Update current user's information
 @router.put("/me", response_model=UserRead)
 async def update_me(
-    email: EmailStr = Form(...),
+    name: Optional[str] = Form(None),
     phone: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
     lon: Optional[float] = Form(None),
     lat: Optional[float] = Form(None),
     profile_image: UploadFile = File(None),
-    password: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -52,14 +51,11 @@ async def update_me(
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    db_user.email = email
+    db_user.name = name
     db_user.phone = phone
     db_user.address = address
     db_user.lon = lon
     db_user.lat = lat
-
-    if password:
-        db_user.hashed_password = get_password_hash(password)
 
     # Handle profile image upload if provided
     if profile_image:
