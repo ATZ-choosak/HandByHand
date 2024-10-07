@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class OwnerInfo(BaseModel):
     id: int
-    email: str
+    name: str
     phone: Optional[str] = None
     profile_image: Optional[Dict[str, str]] = None
 class UserBase(BaseModel):

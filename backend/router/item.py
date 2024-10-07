@@ -134,7 +134,7 @@ async def get_items(
                 **{k: v for k, v in item.__dict__.items() if k != 'owner'},
                 owner=OwnerInfo(
                     id=item.owner.id,
-                    email=item.owner.email,
+                    name=item.owner.name,
                     phone=item.owner.phone,
                     profile_image=item.owner.profile_image
                 )
