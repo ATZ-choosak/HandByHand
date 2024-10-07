@@ -21,7 +21,7 @@ async def create_item(
     title: str = Form(...),
     description: str = Form(...),
     category_id: int = Form(...),
-    preferred_category_ids: str = Form(...),
+    preferred_category_ids: Optional[str] = Form(None),
     is_exchangeable: bool = Form(...),
     require_all_categories: bool = Form(...),
     address: Optional[str] = Form(None),
@@ -31,29 +31,32 @@ async def create_item(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    if not re.match(r'^[0-9,]+$', preferred_category_ids):
-        raise HTTPException(status_code=400, detail="Invalid format for preferred_category_ids. Please provide comma-separated integers only.")
+    if preferred_category_ids:
+        if not re.match(r'^[0-9,]+$', preferred_category_ids):
+            raise HTTPException(status_code=400, detail="Invalid format for preferred_category_ids. Please provide comma-separated integers only.")
 
-    try:
-        preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid category IDs format. Please provide valid integers.")
+        try:
+            preferred_category_ids = [int(id.strip()) for id in preferred_category_ids.split(',') if id.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid category IDs format. Please provide valid integers.")
+
+        result = await session.execute(select(Category.id).where(Category.id.in_(preferred_category_ids)))
+        existing_category_ids = set(result.scalars().all())
+        invalid_category_ids = set(preferred_category_ids) - existing_category_ids
+        if invalid_category_ids:
+            raise HTTPException(status_code=400, detail=f"Invalid preferred category IDs: {invalid_category_ids}")
+    else:
+        preferred_category_ids = []
 
     category = await session.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=400, detail=f"Invalid category ID: {category_id}")
 
-    result = await session.execute(select(Category.id).where(Category.id.in_(preferred_category_ids)))
-    existing_category_ids = set(result.scalars().all())
-    invalid_category_ids = set(preferred_category_ids) - existing_category_ids
-    if invalid_category_ids:
-        raise HTTPException(status_code=400, detail=f"Invalid preferred category IDs: {invalid_category_ids}")
-
     db_item = Item(
         title=title,
         description=description,
         category_id=category_id,
-        preferred_category_ids=list(existing_category_ids),
+        preferred_category_ids=preferred_category_ids,
         is_exchangeable=is_exchangeable,
         require_all_categories=require_all_categories,
         address=address,
@@ -86,6 +89,7 @@ async def create_item(
     await session.commit()
     await session.refresh(db_item)
     return db_item
+
 # Get all items posted by the current user
 @router.get("/my-items", response_model=List[ItemRead])
 async def get_user_items(
