@@ -24,8 +24,10 @@ class UserBase(BaseModel):
     lat: Optional[float] = None
     profile_image: Optional[Dict[str, str]] = Field(sa_column=Column(JSON), default=None) 
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    email: EmailStr
     password: str
+
 
 class UserRead(UserBase):
     id: int
