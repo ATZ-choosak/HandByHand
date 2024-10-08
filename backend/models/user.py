@@ -31,6 +31,7 @@ class UserCreate(BaseModel):
 
 class UserRead(UserBase):
     id: int
+    name: Optional[str] = None
     email: str
     phone: Optional[str] = None
     address: Optional[str] = None
