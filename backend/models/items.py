@@ -34,6 +34,8 @@ class ItemRead(ItemBase):
     category: CategoryInfo
     preferred_category: List[CategoryInfo]
     owner: OwnerInfo
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         orm_mode = True
@@ -53,3 +55,5 @@ class Item(ItemBase, table=True):
     exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
     category: Optional["Category"] = Relationship(back_populates="items")
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
