@@ -1,5 +1,6 @@
 from fastapi import UploadFile
 from pydantic import BaseModel, EmailStr
+import pytz
 from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Dict, Optional, List
@@ -7,10 +8,13 @@ from datetime import datetime
 
 from typing import Optional, List, TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from .items import Item
     from .exchanges import Exchange
 
+def thailand_now():
+    return datetime.now(pytz.timezone('Asia/Bangkok'))
 class OwnerInfo(BaseModel):
     id: int
     name: Optional[str] = None
@@ -68,8 +72,8 @@ class User(SQLModel, UserBase, table=True):
     is_active: bool = Field(default=False)
     is_verified: bool = Field(default=False)
     is_first_login: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=thailand_now)
+    updated_at: datetime = Field(default_factory=thailand_now)
     items: List["Item"] = Relationship(back_populates="owner")
     exchanges_requested: List["Exchange"] = Relationship(back_populates="requester")
     post_count: int = Field(default=0)

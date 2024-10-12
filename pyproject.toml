@@ -23,6 +23,7 @@ email-validator = "^2.2.0"
 passlib = "^1.7.4"
 pymongo = "^4.8.0"
 motor = "^3.5.1"
+pytz = "^2024.2"
 
 
 [tool.poetry.group.develop.dependencies]

@@ -1,8 +1,10 @@
 from pydantic import BaseModel
+import pytz
 from sqlalchemy import JSON, Column
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
+
 from .user import OwnerInfo
 
 if TYPE_CHECKING:
@@ -10,6 +12,8 @@ if TYPE_CHECKING:
     from .exchanges import Exchange
     from .category import Category
 
+def thailand_now():
+    return datetime.now(pytz.timezone('Asia/Bangkok')).replace(tzinfo=None)
 class CategoryInfo(BaseModel):
     id: int
     name: str
@@ -55,5 +59,5 @@ class Item(ItemBase, table=True):
     exchanges_offered: List["Exchange"] = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
     category: Optional["Category"] = Relationship(back_populates="items")
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=thailand_now)
+    updated_at: datetime = Field(default_factory=thailand_now, sa_column_kwargs={"onupdate": thailand_now})

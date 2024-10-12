@@ -2,9 +2,10 @@ import os
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Request
 from fastapi.responses import HTMLResponse
+import pytz
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
 from typing import TYPE_CHECKING, Annotated, Optional
@@ -40,9 +41,13 @@ async def register_user(
         )
 
     hashed_password = get_password_hash(user_input.password)
+    thailand_tz = pytz.timezone('Asia/Bangkok')
+    current_time = datetime.now(thailand_tz).replace(tzinfo=None)
     db_user = User(
         email=user_input.email,
         hashed_password=hashed_password,
+        created_at=current_time,
+        updated_at=current_time,
     )
 
     session.add(db_user)

@@ -4,12 +4,12 @@ import shutil
 from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
-from sqlalchemy import func
+from sqlalchemy import asc, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from sqlalchemy.orm import joinedload
 from backend.models.category import Category
-from ..models.items import CategoryInfo, Item, ItemCreate, ItemRead, PaginatedItemResponse
+from ..models.items import CategoryInfo, Item, ItemCreate, ItemRead, PaginatedItemResponse, thailand_now
 from ..db import get_session
 from ..utils.auth import get_current_user
 from ..models.user import OwnerInfo, User
@@ -53,6 +53,7 @@ async def create_item(
     if not category:
         raise HTTPException(status_code=400, detail=f"Invalid category ID: {category_id}")
 
+    current_time = thailand_now()
     db_item = Item(
         title=title,
         description=description,
@@ -63,7 +64,11 @@ async def create_item(
         address=address,
         lon=lon,
         lat=lat,
-        owner_id=current_user.id
+        owner_id=current_user.id,
+        created_at=current_time,
+        updated_at=current_time,
+        
+        
     )
     session.add(db_item)
     await session.flush()
@@ -152,11 +157,18 @@ async def get_items(
     session: AsyncSession = Depends(get_session),
     query: str = Query(None, min_length=3, description="Search query for items"),
     page: int = Query(1, ge=1, description="Page number"),
-    items_per_page: int = Query(10, ge=1, le=100, description="Items per page")
+    items_per_page: int = Query(10, ge=1, le=100, description="Items per page"),
+    sort_by: str = Query("created_at", description="Field to sort by"),
+    sort_order: str = Query("desc", description="Sort order (asc or desc)")
 ):
     statement = select(Item).options(selectinload(Item.owner), selectinload(Item.category))
     if query:
         statement = statement.where(Item.title.ilike(f"%{query}%"))
+
+    # Add sorting
+    if hasattr(Item, sort_by):
+        order_func = desc if sort_order.lower() == "desc" else asc
+        statement = statement.order_by(order_func(getattr(Item, sort_by)))
 
     # Count total items
     count_statement = select(func.count()).select_from(Item)
@@ -278,6 +290,7 @@ async def update_item(
     db_item.address = address
     db_item.lon = lon
     db_item.lat = lat
+    db_item.updated_at = thailand_now() 
 
     # จัดการกับรูปภาพใหม่
     if images:
