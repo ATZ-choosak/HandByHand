@@ -40,7 +40,8 @@ async def get_chat_sessions(
             "user": {
                 "id": other_user_id,
                 "name": other_user.name if other_user else "Unknown User",
-                "email": other_user.email if other_user else None
+                "email": other_user.email if other_user else None,
+                "profile_image": other_user.profile_image if other_user and other_user.profile_image else None
             }
         }
         chat_list.append(chat_info)
@@ -138,33 +139,37 @@ async def get_messages_by_chat_id(
 ) -> List[Dict[str, Any]]:
     collection = get_db().get_collection("chats")
     
-    # Convert chat_id to ObjectId
     try:
         chat_object_id = ObjectId(chat_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid chat ID format: {str(e)}")
     
-    # Find the chat session by chat_id
     chat = collection.find_one({"_id": chat_object_id})
     if chat is None:
         raise HTTPException(status_code=404, detail=f"Chat session with ID {chat_id} not found")
     
-    # Check if the current user is part of the chat
     if chat["user1"] != current_user.id and chat["user2"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view messages in this chat")
     
-    # Retrieve the messages from the chat
     messages = chat.get("messages", [])
     
-    # Replace sender and receiver IDs with names
     for msg in messages:
         sender = await session.get(User, msg["sender"])
         receiver = await session.get(User, msg["receiver"])
         
-        msg["sender_name"] = sender.email if sender else "Unknown User"
-        msg["receiver_name"] = receiver.email if receiver else "Unknown User"
+        msg["sender"] = {
+            "id": sender.id,
+            "name": sender.name if sender else "Unknown User",
+            "email": sender.email if sender else None,
+            "profile_image": sender.profile_image if sender and sender.profile_image else None
+        }
+        msg["receiver"] = {
+            "id": receiver.id,
+            "name": receiver.name if receiver else "Unknown User",
+            "email": receiver.email if receiver else None,
+            "profile_image": receiver.profile_image if receiver and receiver.profile_image else None
+        }
         
-        # Add a flag to indicate if the sender or receiver is the current user
         msg["sender_is_me"] = sender.id == current_user.id if sender else False
         msg["receiver_is_me"] = receiver.id == current_user.id if receiver else False
     
