@@ -12,7 +12,7 @@ from sqlmodel import select
 from pydantic import EmailStr
 
 
-from ..models.user import User, UserCreate, UserRead, UserLoginInput
+from ..models.user import User, UserCreate, UserRead, UserLoginInput, UserResendVerifyInput, UserResetPasswordInput
 from ..db import get_session
 from ..utils.email import send_password_reset_email
 from ..utils.auth import create_access_token, get_password_hash, verify_password,create_password_reset_token,create_verification_token
@@ -149,10 +149,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer", "is_first_login": user.is_first_login}
 @router.post("/password-reset/request")
 async def request_password_reset(
-    email: str = Form(...),
+    input: UserResetPasswordInput,
     session: AsyncSession = Depends(get_session)
 ):
-    result = await session.execute(select(User).where(User.email == email))
+    result = await session.execute(select(User).where(User.email == input.email))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email not found")
@@ -185,10 +185,10 @@ async def reset_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
 @router.post("/resend-verification")
 async def resend_verification_link(
-    email: str = Form(...),
+    input: UserResendVerifyInput,
     session: AsyncSession = Depends(get_session)
 ):
-    result = await session.execute(select(User).where(User.email == email))
+    result = await session.execute(select(User).where(User.email == input.email))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
