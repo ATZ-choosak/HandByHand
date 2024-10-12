@@ -2,10 +2,14 @@ import os
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import EmailStr
+from sqlalchemy import func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from typing import List, Optional
 
+from backend.models.exchanges import Exchange
+from backend.models.items import Item
+from backend.models.rating import Rating, RatingCreate
 from backend.utils.utils import create_user_directory
 
 from ..models.user import User, UserRead, UserCreate
@@ -24,9 +28,59 @@ router = APIRouter()
 #     return {"message": "User deleted successfully"}
 # Get current user's information
 @router.get("/me", response_model=UserRead)
-async def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    # Get post count
+    post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == current_user.id))
+    current_user.post_count = post_count.scalar_one()
 
+    # Get exchange complete count
+    exchange_complete_count = await session.execute(
+        select(func.count(Exchange.id))
+        .join(Item, Exchange.requested_item_id == Item.id)
+        .where(or_(
+            Exchange.requester_id == current_user.id,
+            Item.owner_id == current_user.id
+        ))
+        .where(Exchange.status == "accepted")
+    )
+    current_user.exchange_complete_count = exchange_complete_count.scalar_one()
+
+    return current_user
+@router.post("/rating")
+async def create_rating(
+    rating: RatingCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    # Check if the user exists
+    user = await session.get(User, rating.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if the user is trying to rate themselves
+    if current_user.id == rating.user_id:
+        raise HTTPException(status_code=400, detail="You cannot rate yourself")
+
+    # Check if the current user has already rated this user
+    existing_rating = await session.execute(
+        select(Rating).where(Rating.user_id == rating.user_id, Rating.rater_id == current_user.id)
+    )
+    if existing_rating.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="You have already rated this user")
+
+    # Create new rating
+    new_rating = Rating(user_id=rating.user_id, rater_id=current_user.id, score=rating.score)
+    session.add(new_rating)
+
+    # Update user's rating
+    user.rating = (user.rating * user.rating_count + rating.score) / (user.rating_count + 1)
+    user.rating_count += 1
+
+    await session.commit()
+    return {"message": "Rating submitted successfully"}
 # Get all users (Admin only)
 @router.get("/", response_model=List[UserRead])
 async def get_users(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):

@@ -42,7 +42,9 @@ class UserRead(UserBase):
     is_first_login: bool
     created_at: datetime
     updated_at: datetime
-    
+    post_count: int
+    exchange_complete_count: int
+    rating: float
     class Config:
         orm_mode = True
 
@@ -70,7 +72,10 @@ class User(SQLModel, UserBase, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     items: List["Item"] = Relationship(back_populates="owner")
     exchanges_requested: List["Exchange"] = Relationship(back_populates="requester")
-
+    post_count: int = Field(default=0)
+    exchange_complete_count: int = Field(default=0)
+    rating: float = Field(default=0.0)
+    rating_count: int = Field(default=0)
     
     @property
     def owner_info(self) -> OwnerInfo:

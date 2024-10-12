@@ -9,6 +9,7 @@ from backend.models.user import *
 from backend.models.exchanges import *
 from backend.models.category import * 
 from backend.models.customer_interest import * 
+from backend.models.rating import * 
 connect_args = {}
 
 engine = None
