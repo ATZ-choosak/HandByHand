@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exchange Confirmation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Exchange Confirmation</h1>
+        <p>Dear {{ user_name }},</p>
+        <p>Your exchange has been successfully completed. Here are the details:</p>
+        <ul>
+            <li>Requested Item: {{ requested_item }}</li>
+            <li>Offered Item: {{ offered_item }}</li>
+        </ul>
+        <p>Thank you for using our platform!</p>
+    </div>
+</body>
+</html>

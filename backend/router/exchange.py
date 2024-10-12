@@ -2,6 +2,8 @@ from typing import List
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+
+from backend.utils.email import send_exchange_confirmation_email
 from ..models.exchanges import Exchange, ExchangeCreate, ExchangeRead
 from ..models.items import Item
 from ..db import get_session
@@ -80,6 +82,25 @@ async def accept_exchange(
     exchange.status = "accepted"
     await session.commit()
     await session.refresh(exchange)
+
+    # Fetch the offered item and requester
+    offered_item = await session.get(Item, exchange.offered_item_id)
+    requester = await session.get(User, exchange.requester_id)
+
+    # Send confirmation emails
+    await send_exchange_confirmation_email(
+        current_user.email,
+        current_user.name or current_user.email,
+        requested_item.title,
+        offered_item.title
+    )
+    await send_exchange_confirmation_email(
+        requester.email,
+        requester.name or requester.email,
+        requested_item.title,
+        offered_item.title
+    )
+
     return exchange
 
 @router.post("/{exchange_id}/reject", response_model=ExchangeRead)
