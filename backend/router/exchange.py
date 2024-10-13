@@ -42,7 +42,7 @@ async def request_exchange(
 
 @router.post("/exchange-request")
 async def request_exchange_check(
-    requested_item_id: int,
+    requested_item_id: int = Body(...),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
