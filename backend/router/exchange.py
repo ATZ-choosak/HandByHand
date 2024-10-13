@@ -6,7 +6,7 @@ from sqlmodel import select
 from sqlalchemy.orm import joinedload
 from backend.models.category import Category
 from backend.utils.email import send_exchange_confirmation_email
-from ..models.exchanges import Exchange, ExchangeAcceptReject, ExchangeCreate, ExchangeRead, ExchangeRequestCheck, ExchangeUUIDCheck, ItemInfo
+from ..models.exchanges import Exchange, ExchangeAcceptReject, ExchangeCreate, ExchangeRead, ExchangeRequestCheck, ExchangeUUIDCheck, ItemInfo, UserInfo
 from ..models.items import Item
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -141,7 +141,8 @@ async def get_incoming_exchanges(
         select(Exchange)
         .options(
             joinedload(Exchange.requested_item).joinedload(Item.category),
-            joinedload(Exchange.offered_item).joinedload(Item.category)
+            joinedload(Exchange.offered_item).joinedload(Item.category),
+            joinedload(Exchange.requester)
         )
         .join(Item, Exchange.requested_item_id == Item.id)
         .where(Item.owner_id == current_user.id)
@@ -164,7 +165,13 @@ async def get_incoming_exchanges(
                 id=exchange.offered_item.id,
                 name=exchange.offered_item.title,
                 category=exchange.offered_item.category.name if exchange.offered_item and exchange.offered_item.category else None
-            ) if exchange.offered_item else None
+            ) if exchange.offered_item else None,
+            requester=UserInfo(
+                id=exchange.requester.id,
+                name=exchange.requester.name,
+                email=exchange.requester.email,
+                profile_image=exchange.requester.profile_image
+            )
         )
         for exchange in exchanges
     ]
@@ -226,7 +233,9 @@ async def get_outgoing_exchanges(
         select(Exchange)
         .options(
             joinedload(Exchange.requested_item).joinedload(Item.category),
-            joinedload(Exchange.offered_item).joinedload(Item.category)
+            joinedload(Exchange.requested_item).joinedload(Item.owner),
+            joinedload(Exchange.offered_item).joinedload(Item.category),
+            joinedload(Exchange.offered_item).joinedload(Item.owner)
         )
         .where(Exchange.requester_id == current_user.id)
     )
@@ -247,12 +256,17 @@ async def get_outgoing_exchanges(
             offered_item=ItemInfo(
                 id=exchange.offered_item.id,
                 name=exchange.offered_item.title,
-                category=exchange.offered_item.category.name if exchange.offered_item and exchange.offered_item.category else None
-            ) if exchange.offered_item else None
+                category=exchange.offered_item.category.name if exchange.offered_item.category else None
+            ) if exchange.offered_item else None,
+            owner=UserInfo(
+                id=exchange.requested_item.owner.id,
+                name=exchange.requested_item.owner.name,
+                email=exchange.requested_item.owner.email,
+                profile_image=exchange.requested_item.owner.profile_image
+            ) if exchange.requested_item.owner else None
         )
         for exchange in exchanges
     ]
-
 @router.post("/accept", response_model=ExchangeRead)
 async def accept_exchange(
     data: ExchangeAcceptReject,

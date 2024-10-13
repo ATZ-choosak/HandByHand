@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .user import User
@@ -24,7 +24,11 @@ class ItemInfo(BaseModel):
     id: int
     name: str
     category: str
-
+class UserInfo(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: str
+    profile_image: Optional[Dict[str, str]] = None
 class ExchangeRead(ExchangeBase):
     id: int
     status: str
@@ -32,6 +36,8 @@ class ExchangeRead(ExchangeBase):
     requested_item: ItemInfo
     offered_item: Optional[ItemInfo] = None
     offered_item_id: Optional[int] = None
+    requester: Optional[UserInfo] = None  # For incoming exchanges
+    owner: Optional[UserInfo] = None
 class ExchangeRequestCheck(BaseModel):
     requested_item_id: int
 class Exchange(SQLModel, table=True):
