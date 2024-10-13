@@ -201,11 +201,18 @@ async def check_exchange_uuid(
     # Update the exchange status to complete
     exchange.status = "completed"
     
-    # Delete the requested and offered items
+    # Increment exchange_complete_count for both users
+    requester = await session.get(User, exchange.requester_id)
+    owner = await session.get(User, requested_item.owner_id)
+    
+    requester.exchange_complete_count += 1
+    owner.exchange_complete_count += 1
+    
+    # Mark the items as exchanged instead of deleting them
     if requested_item:
-        await session.delete(requested_item)
+        requested_item.is_exchanged = True
     if offered_item:
-        await session.delete(offered_item)
+        offered_item.is_exchanged = True
     
     await session.commit()
     await session.refresh(exchange)
@@ -228,8 +235,7 @@ async def check_exchange_uuid(
         offered_item.title if offered_item else "N/A"
     )
 
-    return {"message": "Exchange completed successfully and items deleted", "exchange": exchange}
-
+    return {"message": "Exchange completed successfully and items marked as exchanged", "exchange": exchange}
 
 @router.get("/outgoing", response_model=List[ExchangeRead])
 async def get_outgoing_exchanges(

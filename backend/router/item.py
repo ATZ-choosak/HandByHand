@@ -156,7 +156,7 @@ async def get_user_items(
 @router.get("/", response_model=PaginatedItemResponse)
 async def get_items(
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # เพิ่มบรรทัดนี้
+    current_user: User = Depends(get_current_user),
     query: str = Query(None, min_length=0, description="Search query for items"),
     page: int = Query(1, ge=1, description="Page number"),
     items_per_page: int = Query(10, ge=1, le=100, description="Items per page"),
@@ -176,11 +176,12 @@ async def get_items(
     if query:
         statement = statement.where(Item.title.ilike(f"%{query}%"))
     
-    # Exclude items that the user has requested and their own items
+    # Modify the main query to exclude exchanged items
     statement = statement.where(
         not_(or_(
             Item.id.in_(requested_item_ids),
-            Item.owner_id == current_user.id
+            Item.owner_id == current_user.id,
+            Item.is_exchanged == True  # Add this condition
         ))
     )
 

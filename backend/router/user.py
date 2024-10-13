@@ -34,7 +34,6 @@ async def get_me(
 ):
     # Get post count
     post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == current_user.id))
-    
     current_user.post_count = post_count.scalar_one()
 
     # Get exchange complete count
@@ -65,23 +64,22 @@ async def create_rating(
     if current_user.id == rating.user_id:
         raise HTTPException(status_code=400, detail="You cannot rate yourself")
 
-    # Check if the current user has already rated this user
-    existing_rating = await session.execute(
-        select(Rating).where(Rating.user_id == rating.user_id, Rating.rater_id == current_user.id)
-    )
-    if existing_rating.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="You have already rated this user")
-
     # Create new rating
     new_rating = Rating(user_id=rating.user_id, rater_id=current_user.id, score=rating.score)
     session.add(new_rating)
 
-    # Update user's rating
-    user.rating = (user.rating * user.rating_count + rating.score) / (user.rating_count + 1)
-    user.rating_count += 1
+    # Calculate the new average rating
+    all_ratings = await session.execute(
+        select(Rating.score).where(Rating.user_id == rating.user_id)
+    )
+    all_ratings = all_ratings.scalars().all()
+    
+    user.rating = sum(all_ratings) / len(all_ratings)
+    user.rating_count = len(all_ratings)
 
     await session.commit()
     return {"message": "Rating submitted successfully"}
+
 # Get all users (Admin only)
 @router.get("/", response_model=List[UserRead])
 async def get_users(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -164,7 +162,7 @@ async def get_user_by_id(
     # Get post count
     post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == user.id))
     user.post_count = post_count.scalar_one()
-
+    
     # Get exchange complete count
     exchange_complete_count = await session.execute(
         select(func.count(Exchange.id))
