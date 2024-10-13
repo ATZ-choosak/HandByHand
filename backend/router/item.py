@@ -360,7 +360,45 @@ async def update_item(
             for cat in preferred_categories
         ]
     )
+@router.get("/user/{user_id}", response_model=List[ItemRead])
+async def get_items_by_user_id(
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    result = await session.execute(
+        select(Item)
+        .options(selectinload(Item.owner), selectinload(Item.category))
+        .where(Item.owner_id == user_id)
+    )
+    items = result.scalars().all()
 
+    item_reads = []
+    for item in items:
+        preferred_categories = await session.execute(
+            select(Category).where(Category.id.in_(item.preferred_category_ids))
+        )
+        preferred_categories = preferred_categories.scalars().all()
+
+        item_reads.append(ItemRead(
+            **{k: v for k, v in item.__dict__.items() if k not in ['owner', 'category']},
+            owner=OwnerInfo(
+                id=item.owner.id,
+                name=item.owner.name,
+                phone=item.owner.phone,
+                profile_image=item.owner.profile_image
+            ),
+            category=CategoryInfo(
+                id=item.category.id,
+                name=item.category.name
+            ) if item.category else None,
+            preferred_category=[
+                CategoryInfo(id=cat.id, name=cat.name)
+                for cat in preferred_categories
+            ]
+        ))
+
+    return item_reads
 
 # Delete an item
 @router.delete("/{item_id}")
