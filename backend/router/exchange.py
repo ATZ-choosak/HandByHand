@@ -3,10 +3,10 @@ import uuid
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-
+from sqlalchemy.orm import joinedload
 from backend.models.category import Category
 from backend.utils.email import send_exchange_confirmation_email
-from ..models.exchanges import Exchange, ExchangeAcceptReject, ExchangeCreate, ExchangeRead, ExchangeRequestCheck, ExchangeUUIDCheck
+from ..models.exchanges import Exchange, ExchangeAcceptReject, ExchangeCreate, ExchangeRead, ExchangeRequestCheck, ExchangeUUIDCheck, ItemInfo
 from ..models.items import Item
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -39,7 +39,34 @@ async def request_exchange(
     session.add(db_exchange)
     await session.commit()
     await session.refresh(db_exchange)
-    return db_exchange
+
+    # Fetch item details
+    requested_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == db_exchange.requested_item_id)
+    )
+    offered_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == db_exchange.offered_item_id)
+    )
+    requested_item = requested_item.scalar_one()
+    offered_item = offered_item.scalar_one()
+
+    return ExchangeRead(
+        id=db_exchange.id,
+        status=db_exchange.status,
+        exchange_uuid=db_exchange.exchange_uuid,
+        requested_item_id=db_exchange.requested_item_id,
+        offered_item_id=db_exchange.offered_item_id,
+        requested_item=ItemInfo(
+            id=requested_item.id,
+            name=requested_item.title,
+            category=requested_item.category.name
+        ),
+        offered_item=ItemInfo(
+            id=offered_item.id,
+            name=offered_item.title,
+            category=offered_item.category.name
+        )
+    )
 
 @router.post("/exchange-request")
 async def request_exchange_check(
@@ -95,10 +122,36 @@ async def get_incoming_exchanges(
     current_user: User = Depends(get_current_user)
 ):
     result = await session.execute(
-        select(Exchange).join(Item, Exchange.requested_item_id == Item.id).where(Item.owner_id == current_user.id)
+        select(Exchange)
+        .options(
+            joinedload(Exchange.requested_item).joinedload(Item.category),
+            joinedload(Exchange.offered_item).joinedload(Item.category)
+        )
+        .join(Item, Exchange.requested_item_id == Item.id)
+        .where(Item.owner_id == current_user.id)
     )
     exchanges = result.scalars().all()
-    return exchanges
+    
+    return [
+        ExchangeRead(
+            id=exchange.id,
+            status=exchange.status,
+            exchange_uuid=exchange.exchange_uuid,
+            requested_item_id=exchange.requested_item_id,
+            offered_item_id=exchange.offered_item_id,
+            requested_item=ItemInfo(
+                id=exchange.requested_item.id,
+                name=exchange.requested_item.title,
+                category=exchange.requested_item.category.name
+            ),
+            offered_item=ItemInfo(
+                id=exchange.offered_item.id,
+                name=exchange.offered_item.title,
+                category=exchange.offered_item.category.name
+            )
+        )
+        for exchange in exchanges
+    ]
 
 @router.post("/check-uuid")
 async def check_exchange_uuid(
@@ -153,12 +206,36 @@ async def get_outgoing_exchanges(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Query for all exchanges requested by the current user
     result = await session.execute(
-        select(Exchange).where(Exchange.requester_id == current_user.id)
+        select(Exchange)
+        .options(
+            joinedload(Exchange.requested_item).joinedload(Item.category),
+            joinedload(Exchange.offered_item).joinedload(Item.category)
+        )
+        .where(Exchange.requester_id == current_user.id)
     )
     exchanges = result.scalars().all()
-    return exchanges
+    
+    return [
+        ExchangeRead(
+            id=exchange.id,
+            status=exchange.status,
+            exchange_uuid=exchange.exchange_uuid,
+            requested_item_id=exchange.requested_item_id,
+            offered_item_id=exchange.offered_item_id,
+            requested_item=ItemInfo(
+                id=exchange.requested_item.id,
+                name=exchange.requested_item.title,
+                category=exchange.requested_item.category.name
+            ),
+            offered_item=ItemInfo(
+                id=exchange.offered_item.id,
+                name=exchange.offered_item.title,
+                category=exchange.offered_item.category.name
+            )
+        )
+        for exchange in exchanges
+    ]
 
 @router.post("/accept", response_model=ExchangeRead)
 async def accept_exchange(
@@ -171,7 +248,10 @@ async def accept_exchange(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found")
 
     # Verify the current user is the owner of the requested item
-    requested_item = await session.get(Item, exchange.requested_item_id)
+    requested_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.requested_item_id)
+    )
+    requested_item = requested_item.scalar_one()
     if requested_item.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the owner of the requested item")
 
@@ -184,7 +264,29 @@ async def accept_exchange(
     await session.commit()
     await session.refresh(exchange)
 
-    return exchange
+    # Fetch offered item details
+    offered_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
+    )
+    offered_item = offered_item.scalar_one()
+
+    return ExchangeRead(
+        id=exchange.id,
+        status=exchange.status,
+        exchange_uuid=exchange.exchange_uuid,
+        requested_item_id=exchange.requested_item_id,
+        offered_item_id=exchange.offered_item_id,
+        requested_item=ItemInfo(
+            id=requested_item.id,
+            name=requested_item.title,
+            category=requested_item.category.name
+        ),
+        offered_item=ItemInfo(
+            id=offered_item.id,
+            name=offered_item.title,
+            category=offered_item.category.name
+        )
+    )
 
 @router.post("/reject", response_model=ExchangeRead)
 async def reject_exchange(
@@ -197,7 +299,10 @@ async def reject_exchange(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found")
 
     # Verify the current user is the owner of the requested item
-    requested_item = await session.get(Item, exchange.requested_item_id)
+    requested_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.requested_item_id)
+    )
+    requested_item = requested_item.scalar_one()
     if requested_item.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the owner of the requested item")
 
@@ -205,7 +310,30 @@ async def reject_exchange(
     exchange.status = "rejected"
     await session.commit()
     await session.refresh(exchange)
-    return exchange
+
+    # Fetch offered item details
+    offered_item = await session.execute(
+        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
+    )
+    offered_item = offered_item.scalar_one()
+
+    return ExchangeRead(
+        id=exchange.id,
+        status=exchange.status,
+        exchange_uuid=exchange.exchange_uuid,
+        requested_item_id=exchange.requested_item_id,
+        offered_item_id=exchange.offered_item_id,
+        requested_item=ItemInfo(
+            id=requested_item.id,
+            name=requested_item.title,
+            category=requested_item.category.name
+        ),
+        offered_item=ItemInfo(
+            id=offered_item.id,
+            name=offered_item.title,
+            category=offered_item.category.name
+        )
+    )
 
 @router.delete("/{exchange_id}")
 async def delete_exchange(

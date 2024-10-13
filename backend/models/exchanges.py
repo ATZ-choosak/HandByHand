@@ -19,10 +19,17 @@ class ExchangeAcceptReject(BaseModel):
 class ExchangeUUIDCheck(BaseModel):
     exchange_id: int
     exchange_uuid: str
+class ItemInfo(BaseModel):
+    id: int
+    name: str
+    category: str
+
 class ExchangeRead(ExchangeBase):
     id: int
     status: str
     exchange_uuid: Optional[str] = None
+    requested_item: ItemInfo
+    offered_item: ItemInfo
 class ExchangeRequestCheck(BaseModel):
     requested_item_id: int
 class Exchange(SQLModel, table=True):
