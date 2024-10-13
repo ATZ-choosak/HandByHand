@@ -1,11 +1,12 @@
 from typing import List
+import uuid
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.models.category import Category
 from backend.utils.email import send_exchange_confirmation_email
-from ..models.exchanges import Exchange, ExchangeCreate, ExchangeRead, ExchangeRequestCheck
+from ..models.exchanges import Exchange, ExchangeAcceptReject, ExchangeCreate, ExchangeRead, ExchangeRequestCheck, ExchangeUUIDCheck
 from ..models.items import Item
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -93,12 +94,59 @@ async def get_incoming_exchanges(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Query for all exchanges where the item belongs to the current user
     result = await session.execute(
         select(Exchange).join(Item, Exchange.requested_item_id == Item.id).where(Item.owner_id == current_user.id)
     )
     exchanges = result.scalars().all()
     return exchanges
+
+@router.post("/check-uuid")
+async def check_exchange_uuid(
+    data: ExchangeUUIDCheck,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    exchange = await session.get(Exchange, data.exchange_id)
+    if not exchange:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found")
+
+    # Check if the current user is involved in the exchange
+    requested_item = await session.get(Item, exchange.requested_item_id)
+    offered_item = await session.get(Item, exchange.offered_item_id)
+    if exchange.requester_id != current_user.id and requested_item.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not involved in this exchange")
+
+    if exchange.exchange_uuid != data.exchange_uuid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid exchange UUID")
+
+    if exchange.status != "exchanging":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Exchange is not in 'exchanging' status")
+
+    # Update the exchange status to complete
+    exchange.status = "completed"
+    await session.commit()
+    await session.refresh(exchange)
+
+    # Fetch the requester and the owner of the requested item
+    requester = await session.get(User, exchange.requester_id)
+    owner = await session.get(User, requested_item.owner_id)
+
+    # Send confirmation emails
+    await send_exchange_confirmation_email(
+        requester.email,
+        requester.name or requester.email,
+        requested_item.title,
+        offered_item.title
+    )
+    await send_exchange_confirmation_email(
+        owner.email,
+        owner.name or owner.email,
+        requested_item.title,
+        offered_item.title
+    )
+
+    return {"message": "Exchange completed successfully", "exchange": exchange}
+
 
 @router.get("/outgoing", response_model=List[ExchangeRead])
 async def get_outgoing_exchanges(
@@ -112,13 +160,13 @@ async def get_outgoing_exchanges(
     exchanges = result.scalars().all()
     return exchanges
 
-@router.post("/{exchange_id}/accept", response_model=ExchangeRead)
+@router.post("/accept", response_model=ExchangeRead)
 async def accept_exchange(
-    exchange_id: int,
+    data: ExchangeAcceptReject,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    exchange = await session.get(Exchange, exchange_id)
+    exchange = await session.get(Exchange, data.exchange_id)
     if not exchange:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found")
 
@@ -127,38 +175,24 @@ async def accept_exchange(
     if requested_item.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the owner of the requested item")
 
-    # Accept the exchange
-    exchange.status = "accepted"
+    # Generate UUID for the exchange
+    exchange_uuid = str(uuid.uuid4())
+
+    # Update the exchange
+    exchange.status = "exchanging"
+    exchange.exchange_uuid = exchange_uuid
     await session.commit()
     await session.refresh(exchange)
 
-    # Fetch the offered item and requester
-    offered_item = await session.get(Item, exchange.offered_item_id)
-    requester = await session.get(User, exchange.requester_id)
-
-    # Send confirmation emails
-    await send_exchange_confirmation_email(
-        current_user.email,
-        current_user.name or current_user.email,
-        requested_item.title,
-        offered_item.title
-    )
-    await send_exchange_confirmation_email(
-        requester.email,
-        requester.name or requester.email,
-        requested_item.title,
-        offered_item.title
-    )
-
     return exchange
 
-@router.post("/{exchange_id}/reject", response_model=ExchangeRead)
+@router.post("/reject", response_model=ExchangeRead)
 async def reject_exchange(
-    exchange_id: int,
+    data: ExchangeAcceptReject = Body(...),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    exchange = await session.get(Exchange, exchange_id)
+    exchange = await session.get(Exchange, data.exchange_id)
     if not exchange:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found")
 

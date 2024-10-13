@@ -13,11 +13,16 @@ class ExchangeBase(SQLModel):
 
 class ExchangeCreate(ExchangeBase):
     pass
+class ExchangeAcceptReject(BaseModel):
+    exchange_id: int
 
+class ExchangeUUIDCheck(BaseModel):
+    exchange_id: int
+    exchange_uuid: str
 class ExchangeRead(ExchangeBase):
     id: int
     status: str
-
+    exchange_uuid: Optional[str] = None
 class ExchangeRequestCheck(BaseModel):
     requested_item_id: int
 class Exchange(SQLModel, table=True):
@@ -31,5 +36,6 @@ class Exchange(SQLModel, table=True):
     offered_item: "Item" = Relationship(sa_relationship_kwargs={"foreign_keys": "Exchange.offered_item_id"})
 
     status: str = Field(default="pending")
+    exchange_uuid: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
