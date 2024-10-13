@@ -5,7 +5,7 @@ from sqlmodel import select
 
 from backend.models.category import Category
 from backend.utils.email import send_exchange_confirmation_email
-from ..models.exchanges import Exchange, ExchangeCreate, ExchangeRead
+from ..models.exchanges import Exchange, ExchangeCreate, ExchangeRead, ExchangeRequestCheck
 from ..models.items import Item
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -42,12 +42,12 @@ async def request_exchange(
 
 @router.post("/exchange-request")
 async def request_exchange_check(
-    requested_item_id: int = Body(...),
+    request: ExchangeRequestCheck,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     # Fetch the requested item
-    requested_item = await session.get(Item, requested_item_id)
+    requested_item = await session.get(Item, request.requested_item_id)
     if not requested_item:
         raise HTTPException(status_code=404, detail="Requested item not found")
 

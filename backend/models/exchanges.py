@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
@@ -17,6 +18,8 @@ class ExchangeRead(ExchangeBase):
     id: int
     status: str
 
+class ExchangeRequestCheck(BaseModel):
+    requested_item_id: int
 class Exchange(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     requester_id: Optional[int] = Field(default=None, foreign_key="user.id")
