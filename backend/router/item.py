@@ -4,11 +4,12 @@ import shutil
 from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
-from sqlalchemy import asc, desc, func
+from sqlalchemy import asc, desc, func, not_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from sqlalchemy.orm import joinedload
 from backend.models.category import Category
+from backend.models.exchanges import Exchange
 from ..models.items import CategoryInfo, Item, ItemCreate, ItemRead, PaginatedItemResponse, thailand_now
 from ..db import get_session
 from ..utils.auth import get_current_user
@@ -155,25 +156,49 @@ async def get_user_items(
 @router.get("/", response_model=PaginatedItemResponse)
 async def get_items(
     session: AsyncSession = Depends(get_session),
-    query: str = Query(None, min_length=3, description="Search query for items"),
+    current_user: User = Depends(get_current_user),  # เพิ่มบรรทัดนี้
+    query: str = Query(None, min_length=0, description="Search query for items"),
     page: int = Query(1, ge=1, description="Page number"),
     items_per_page: int = Query(10, ge=1, le=100, description="Items per page"),
     sort_by: str = Query("created_at", description="Field to sort by"),
     sort_order: str = Query("desc", description="Sort order (asc or desc)")
 ):
+    # Get the IDs of items that the user has requested to exchange
+    requested_items = await session.execute(
+        select(Exchange.requested_item_id)
+        .where(Exchange.requester_id == current_user.id)
+    )
+    requested_item_ids = [item[0] for item in requested_items.fetchall()]
+
+    # Modify the main query to exclude these items
     statement = select(Item).options(selectinload(Item.owner), selectinload(Item.category))
+    
     if query:
         statement = statement.where(Item.title.ilike(f"%{query}%"))
+    
+    # Exclude items that the user has requested and their own items
+    statement = statement.where(
+        not_(or_(
+            Item.id.in_(requested_item_ids),
+            Item.owner_id == current_user.id
+        ))
+    )
 
     # Add sorting
     if hasattr(Item, sort_by):
         order_func = desc if sort_order.lower() == "desc" else asc
         statement = statement.order_by(order_func(getattr(Item, sort_by)))
 
-    # Count total items
+    # Count total items (with the same filters)
     count_statement = select(func.count()).select_from(Item)
     if query:
         count_statement = count_statement.where(Item.title.ilike(f"%{query}%"))
+    count_statement = count_statement.where(
+        not_(or_(
+            Item.id.in_(requested_item_ids),
+            Item.owner_id == current_user.id
+        ))
+    )
     total_items = await session.execute(count_statement)
     total_items = total_items.scalar_one()
 
