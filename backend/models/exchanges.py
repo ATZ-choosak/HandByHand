@@ -11,8 +11,9 @@ class ExchangeBase(SQLModel):
     requested_item_id: int
     offered_item_id: int
 
-class ExchangeCreate(ExchangeBase):
-    pass
+class ExchangeCreate(BaseModel):
+    requested_item_id: int
+    offered_item_id: Optional[int] = None
 class ExchangeAcceptReject(BaseModel):
     exchange_id: int
 
@@ -29,7 +30,8 @@ class ExchangeRead(ExchangeBase):
     status: str
     exchange_uuid: Optional[str] = None
     requested_item: ItemInfo
-    offered_item: ItemInfo
+    offered_item: Optional[ItemInfo] = None
+    offered_item_id: Optional[int] = None
 class ExchangeRequestCheck(BaseModel):
     requested_item_id: int
 class Exchange(SQLModel, table=True):

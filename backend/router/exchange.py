@@ -20,15 +20,26 @@ async def request_exchange(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Verify the requested and offered items exist
+    # Verify the requested item exists
     requested_item = await session.get(Item, exchange.requested_item_id)
-    offered_item = await session.get(Item, exchange.offered_item_id)
-    if not requested_item or not offered_item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    if not requested_item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requested item not found")
 
     # Prevent users from requesting exchanges on their own items
     if requested_item.owner_id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot request exchange on your own item")
+
+    # Check if the item is exchangeable
+    if requested_item.is_exchangeable:
+        if not exchange.offered_item_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Offered item is required for exchangeable items")
+        
+        offered_item = await session.get(Item, exchange.offered_item_id)
+        if not offered_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offered item not found")
+    else:
+        # If not exchangeable (donation), set offered_item_id to None
+        exchange.offered_item_id = None
 
     # Create the exchange request
     db_exchange = Exchange(
@@ -44,13 +55,9 @@ async def request_exchange(
     requested_item = await session.execute(
         select(Item).options(joinedload(Item.category)).where(Item.id == db_exchange.requested_item_id)
     )
-    offered_item = await session.execute(
-        select(Item).options(joinedload(Item.category)).where(Item.id == db_exchange.offered_item_id)
-    )
     requested_item = requested_item.scalar_one()
-    offered_item = offered_item.scalar_one()
 
-    return ExchangeRead(
+    response = ExchangeRead(
         id=db_exchange.id,
         status=db_exchange.status,
         exchange_uuid=db_exchange.exchange_uuid,
@@ -61,12 +68,21 @@ async def request_exchange(
             name=requested_item.title,
             category=requested_item.category.name
         ),
-        offered_item=ItemInfo(
+        offered_item=None
+    )
+
+    if db_exchange.offered_item_id:
+        offered_item = await session.execute(
+            select(Item).options(joinedload(Item.category)).where(Item.id == db_exchange.offered_item_id)
+        )
+        offered_item = offered_item.scalar_one()
+        response.offered_item = ItemInfo(
             id=offered_item.id,
             name=offered_item.title,
             category=offered_item.category.name
         )
-    )
+
+    return response
 
 @router.post("/exchange-request")
 async def request_exchange_check(
@@ -142,13 +158,13 @@ async def get_incoming_exchanges(
             requested_item=ItemInfo(
                 id=exchange.requested_item.id,
                 name=exchange.requested_item.title,
-                category=exchange.requested_item.category.name
+                category=exchange.requested_item.category.name if exchange.requested_item.category else None
             ),
             offered_item=ItemInfo(
                 id=exchange.offered_item.id,
                 name=exchange.offered_item.title,
-                category=exchange.offered_item.category.name
-            )
+                category=exchange.offered_item.category.name if exchange.offered_item and exchange.offered_item.category else None
+            ) if exchange.offered_item else None
         )
         for exchange in exchanges
     ]
@@ -226,13 +242,13 @@ async def get_outgoing_exchanges(
             requested_item=ItemInfo(
                 id=exchange.requested_item.id,
                 name=exchange.requested_item.title,
-                category=exchange.requested_item.category.name
+                category=exchange.requested_item.category.name if exchange.requested_item.category else None
             ),
             offered_item=ItemInfo(
                 id=exchange.offered_item.id,
                 name=exchange.offered_item.title,
-                category=exchange.offered_item.category.name
-            )
+                category=exchange.offered_item.category.name if exchange.offered_item and exchange.offered_item.category else None
+            ) if exchange.offered_item else None
         )
         for exchange in exchanges
     ]
@@ -264,13 +280,8 @@ async def accept_exchange(
     await session.commit()
     await session.refresh(exchange)
 
-    # Fetch offered item details
-    offered_item = await session.execute(
-        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
-    )
-    offered_item = offered_item.scalar_one()
-
-    return ExchangeRead(
+    # Prepare the response
+    response = ExchangeRead(
         id=exchange.id,
         status=exchange.status,
         exchange_uuid=exchange.exchange_uuid,
@@ -279,14 +290,25 @@ async def accept_exchange(
         requested_item=ItemInfo(
             id=requested_item.id,
             name=requested_item.title,
-            category=requested_item.category.name
+            category=requested_item.category.name if requested_item.category else None
         ),
-        offered_item=ItemInfo(
-            id=offered_item.id,
-            name=offered_item.title,
-            category=offered_item.category.name
-        )
+        offered_item=None
     )
+
+    # Fetch offered item details if it exists
+    if exchange.offered_item_id:
+        offered_item = await session.execute(
+            select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
+        )
+        offered_item = offered_item.scalar_one_or_none()
+        if offered_item:
+            response.offered_item = ItemInfo(
+                id=offered_item.id,
+                name=offered_item.title,
+                category=offered_item.category.name if offered_item.category else None
+            )
+
+    return response
 
 @router.post("/reject", response_model=ExchangeRead)
 async def reject_exchange(
@@ -311,13 +333,8 @@ async def reject_exchange(
     await session.commit()
     await session.refresh(exchange)
 
-    # Fetch offered item details
-    offered_item = await session.execute(
-        select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
-    )
-    offered_item = offered_item.scalar_one()
-
-    return ExchangeRead(
+    # Prepare the response
+    response = ExchangeRead(
         id=exchange.id,
         status=exchange.status,
         exchange_uuid=exchange.exchange_uuid,
@@ -326,14 +343,25 @@ async def reject_exchange(
         requested_item=ItemInfo(
             id=requested_item.id,
             name=requested_item.title,
-            category=requested_item.category.name
+            category=requested_item.category.name if requested_item.category else None
         ),
-        offered_item=ItemInfo(
-            id=offered_item.id,
-            name=offered_item.title,
-            category=offered_item.category.name
-        )
+        offered_item=None
     )
+
+    # Fetch offered item details if it exists
+    if exchange.offered_item_id:
+        offered_item = await session.execute(
+            select(Item).options(joinedload(Item.category)).where(Item.id == exchange.offered_item_id)
+        )
+        offered_item = offered_item.scalar_one_or_none()
+        if offered_item:
+            response.offered_item = ItemInfo(
+                id=offered_item.id,
+                name=offered_item.title,
+                category=offered_item.category.name if offered_item.category else None
+            )
+
+    return response
 
 @router.delete("/{exchange_id}")
 async def delete_exchange(
