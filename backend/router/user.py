@@ -32,23 +32,39 @@ async def get_me(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
-    # Get post count
-    post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == current_user.id))
-    current_user.post_count = post_count.scalar_one()
+    # Query the current user with their post count
+    result = await session.execute(
+        select(User, func.count(Item.id).label('post_count'))
+        .outerjoin(Item, User.id == Item.owner_id)
+        .where(User.id == current_user.id)
+        .group_by(User.id)
+    )
+    user, post_count = result.first()
+
+    # Update the user object with the post count
+    user.post_count = post_count
 
     # Get exchange complete count
     exchange_complete_count = await session.execute(
         select(func.count(Exchange.id))
         .join(Item, Exchange.requested_item_id == Item.id)
         .where(or_(
-            Exchange.requester_id == current_user.id,
-            Item.owner_id == current_user.id
+            Exchange.requester_id == user.id,
+            Item.owner_id == user.id
         ))
-        .where(Exchange.status == "accepted")
+        .where(Exchange.status == "completed")
     )
-    current_user.exchange_complete_count = exchange_complete_count.scalar_one()
+    user.exchange_complete_count = exchange_complete_count.scalar_one()
 
-    return current_user
+    # Refresh the user to ensure we have the latest data
+    await session.refresh(user)
+
+    return user
+
+    # exchange_complete_count is already stored in the User model
+    # No need to recalculate it here
+
+    # Refresh the current_user to ensure we have the latest data
 @router.post("/rating")
 async def create_rating(
     rating: RatingCreate,
@@ -155,14 +171,23 @@ async def get_user_by_id(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    user = await session.get(User, user_id)
-    if not user:
+    # Query the user with their post count
+    result = await session.execute(
+        select(User, func.count(Item.id).label('post_count'))
+        .outerjoin(Item, User.id == Item.owner_id)
+        .where(User.id == user_id)
+        .group_by(User.id)
+    )
+    user_and_post_count = result.first()
+
+    if not user_and_post_count:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    # Get post count
-    post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == user.id))
-    user.post_count = post_count.scalar_one()
-    
+
+    user, post_count = user_and_post_count
+
+    # Update the user object with the post count
+    user.post_count = post_count
+
     # Get exchange complete count
     exchange_complete_count = await session.execute(
         select(func.count(Exchange.id))
@@ -174,6 +199,9 @@ async def get_user_by_id(
         .where(Exchange.status == "completed")
     )
     user.exchange_complete_count = exchange_complete_count.scalar_one()
+
+    # Refresh the user to ensure we have the latest data
+    await session.refresh(user)
 
     return user
 # Delete current user
