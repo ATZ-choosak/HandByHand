@@ -3,6 +3,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.models.category import Category
 from backend.utils.email import send_exchange_confirmation_email
 from ..models.exchanges import Exchange, ExchangeCreate, ExchangeRead
 from ..models.items import Item
@@ -39,6 +40,54 @@ async def request_exchange(
     await session.refresh(db_exchange)
     return db_exchange
 
+@router.post("/exchange-request")
+async def request_exchange_check(
+    requested_item_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the requested item
+    requested_item = await session.get(Item, requested_item_id)
+    if not requested_item:
+        raise HTTPException(status_code=404, detail="Requested item not found")
+
+    # Check if the item is exchangeable
+    if not requested_item.is_exchangeable:
+        # If not exchangeable, allow exchange directly
+        return {"message": "Item is not exchangeable", "can_exchange": True}
+    
+    # If exchangeable, check user's items against preferred categories
+    user_items = await session.execute(
+        select(Item, Category)
+        .join(Category, Item.category_id == Category.id)
+        .where(Item.owner_id == current_user.id)
+    )
+    user_items = user_items.all()
+
+    matching_items = []
+    for item, category in user_items:
+        # Check if the item's category_id matches any of the preferred_category_ids
+        if item.category_id in requested_item.preferred_category_ids:
+            matching_items.append({
+                "id": item.id,
+                "name": item.title,  # Assuming the item's name is stored in the 'title' field
+                "category": {
+                    "id": category.id,
+                    "name": category.name
+                }
+            })
+
+    if matching_items:
+        return {
+            "message": "Exchange possible based on category matching",
+            "can_exchange": True,
+            "matching_items": matching_items
+        }
+    else:
+        return {
+            "message": "No matching items for exchange",
+            "can_exchange": False
+        }
 @router.get("/incoming", response_model=List[ExchangeRead])
 async def get_incoming_exchanges(
     session: AsyncSession = Depends(get_session),
