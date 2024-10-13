@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from .items import Item
 
 class ExchangeBase(SQLModel):
-    requested_item_id: int
-    offered_item_id: int
+    requested_item_id: Optional[int] = None
+    offered_item_id: Optional[int] = None
 
 class ExchangeCreate(BaseModel):
     requested_item_id: int
@@ -33,7 +33,7 @@ class ExchangeRead(ExchangeBase):
     id: int
     status: str
     exchange_uuid: Optional[str] = None
-    requested_item: ItemInfo
+    requested_item: Optional[ItemInfo] = None
     offered_item: Optional[ItemInfo] = None
     offered_item_id: Optional[int] = None
     requester: Optional[UserInfo] = None  # For incoming exchanges

@@ -240,8 +240,8 @@ async def get_outgoing_exchanges(
         select(Exchange)
         .options(
             joinedload(Exchange.requested_item).joinedload(Item.category),
-            joinedload(Exchange.requested_item).joinedload(Item.owner),
             joinedload(Exchange.offered_item).joinedload(Item.category),
+            joinedload(Exchange.requested_item).joinedload(Item.owner),
             joinedload(Exchange.offered_item).joinedload(Item.owner)
         )
         .where(Exchange.requester_id == current_user.id)
@@ -259,18 +259,18 @@ async def get_outgoing_exchanges(
                 id=exchange.requested_item.id,
                 name=exchange.requested_item.title,
                 category=exchange.requested_item.category.name if exchange.requested_item.category else None
-            ),
+            ) if exchange.requested_item else None,
             offered_item=ItemInfo(
                 id=exchange.offered_item.id,
                 name=exchange.offered_item.title,
-                category=exchange.offered_item.category.name if exchange.offered_item.category else None
+                category=exchange.offered_item.category.name if exchange.offered_item and exchange.offered_item.category else None
             ) if exchange.offered_item else None,
             owner=UserInfo(
                 id=exchange.requested_item.owner.id,
                 name=exchange.requested_item.owner.name,
                 email=exchange.requested_item.owner.email,
                 profile_image=exchange.requested_item.owner.profile_image
-            ) if exchange.requested_item.owner else None
+            ) if exchange.requested_item and exchange.requested_item.owner else None
         )
         for exchange in exchanges
     ]

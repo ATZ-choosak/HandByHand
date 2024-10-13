@@ -34,6 +34,7 @@ async def get_me(
 ):
     # Get post count
     post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == current_user.id))
+    
     current_user.post_count = post_count.scalar_one()
 
     # Get exchange complete count
@@ -84,9 +85,25 @@ async def create_rating(
 # Get all users (Admin only)
 @router.get("/", response_model=List[UserRead])
 async def get_users(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
-    # Add your logic for checking if the current user is an admin
-    users = await session.execute(select(User))
-    return users.scalars().all()
+    # Check if the current user is an admin
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Only admins can access this endpoint")
+
+    # Query users with their post count
+    users_with_post_count = await session.execute(
+        select(User, func.count(Item.id).label('post_count'))
+        .outerjoin(Item, User.id == Item.owner_id)
+        .group_by(User.id)
+    )
+
+    # Process the results
+    result = []
+    for user, post_count in users_with_post_count:
+        user_dict = user.__dict__
+        user_dict['post_count'] = post_count
+        result.append(user_dict)
+
+    return result
 
 # Update current user's information
 # Update current user's information
@@ -129,11 +146,38 @@ async def update_me(
             f.write(await profile_image.read())
 
         db_user.profile_image = {"id": profile_image_id, "url": file_location}
-
+    
     session.add(db_user)
     await session.commit()
     await session.refresh(db_user)
     return db_user
+@router.get("/{user_id}", response_model=UserRead)
+async def get_user_by_id(
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    # Get post count
+    post_count = await session.execute(select(func.count(Item.id)).where(Item.owner_id == user.id))
+    user.post_count = post_count.scalar_one()
+
+    # Get exchange complete count
+    exchange_complete_count = await session.execute(
+        select(func.count(Exchange.id))
+        .join(Item, Exchange.requested_item_id == Item.id)
+        .where(or_(
+            Exchange.requester_id == user.id,
+            Item.owner_id == user.id
+        ))
+        .where(Exchange.status == "completed")
+    )
+    user.exchange_complete_count = exchange_complete_count.scalar_one()
+
+    return user
 # Delete current user
 # @router.delete("/me")
 # async def delete_me(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
