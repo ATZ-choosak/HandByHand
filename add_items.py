@@ -41,6 +41,9 @@ async def add_items(num_items: int):
             user = random.choice(users)
             category = random.choice(categories)
             
+            # Generate 3 random unique numbers between 1 and 21 for preferred_category_ids
+            preferred_category_ids = random.sample(range(1, 22), 3)
+            
             # Create a new item
             new_item = Item(
                 title=random.choice(sample_titles),
@@ -53,7 +56,8 @@ async def add_items(num_items: int):
                 lon=random.uniform(100, 101),  # Example longitude range for Thailand
                 lat=random.uniform(13, 14),  # Example latitude range for Thailand
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
+                preferred_category_ids=preferred_category_ids  # Add this line
             )
             
             session.add(new_item)
@@ -63,5 +67,5 @@ async def add_items(num_items: int):
     print(f"{num_items} items have been added to the database.")
 
 if __name__ == "__main__":
-    num_items_to_add = 100  # You can change this number
+    num_items_to_add = 10  # You can change this number
     asyncio.run(add_items(num_items_to_add))
