@@ -3,6 +3,8 @@ import os
 # from gevent import monkey
 # monkey.patch_all()
 
+import socketio
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from . import db
@@ -10,6 +12,7 @@ from . import router
 from .core import config
 from .db import mongodb
 from fastapi.staticfiles import StaticFiles
+from .socket_events import sio
 
 # ใช้ async context manager สำหรับจัดการ lifespan ของแอป
 @asynccontextmanager
@@ -43,6 +46,7 @@ def create_app(settings=None):
     mongodb.init_mongoDB(settings)
     app.mount("/images", StaticFiles(directory="images"), name="images")
     
+    app_socket = socketio.ASGIApp(sio, app)
 
-    return app
+    return app_socket
 
