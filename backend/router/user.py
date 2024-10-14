@@ -204,13 +204,3 @@ async def get_user_by_id(
     await session.refresh(user)
 
     return user
-# Delete current user
-# @router.delete("/me")
-# async def delete_me(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
-#     db_user = await session.get(User, current_user.id)
-#     if not db_user:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-#     await session.delete(db_user)
-#     await session.commit()
-#     return {"message": "User deleted successfully"}
