@@ -66,3 +66,9 @@ The API documentation is available at the following link:
 ---
 
 Happy coding!
+
+## 6. Jenkins & SonarQube
+![image](https://github.com/user-attachments/assets/eee2c7a2-c84d-4018-90d8-39cf8d3d233c)
+![image](https://github.com/user-attachments/assets/6e209b6a-29ab-40aa-b202-e96f8f4b9fdf)
+
+
